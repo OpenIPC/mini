@@ -1,0 +1,9 @@
+*
+!/minihttp/Makefile
+!/minihttp/CMakeLists.txt
+!/minihttp/include/*.h
+!/minihttp/src/**/*.h
+!/minihttp/src/**/*.c
+
+!.dockerignore
+!*/.dockerignore

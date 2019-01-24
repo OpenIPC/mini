@@ -1,0 +1,14 @@
+*
+!*/
+
+!/Dockerfile
+!/build.sh
+
+!/minihttp/Makefile
+!/minihttp/CMakeLists.txt
+!/minihttp/src/*.h
+!/minihttp/src/*.c
+
+!.dockerignore
+!.gitignore
+!*/.gitignore
