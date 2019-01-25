@@ -28,15 +28,15 @@ const char* getMime(const char *path) {
 
 
 #define MAX_ERROR_MSG 0x1000
-static int compile_regex(regex_t * r, const char * regex_text) {
-    int status = regcomp(r, regex_text, REG_EXTENDED|REG_NEWLINE);
+int compile_regex(regex_t * r, const char * regex_text) {
+    int status = regcomp(r, regex_text, REG_EXTENDED|REG_NEWLINE|REG_ICASE);
     if (status != 0) {
         char error_message[MAX_ERROR_MSG];
         regerror(status, r, error_message, MAX_ERROR_MSG);
         printf("Regex error compiling '%s': %s\n", regex_text, error_message); fflush(stdout);
-        return 1;
+        return -1;
     }
-    return 0;
+    return 1;
 }
 
 int parseRequestPath(const char *headers, char *path) {
@@ -47,7 +47,7 @@ int parseRequestPath(const char *headers, char *path) {
     const char * p = headers;
     int match = regexec(&regex, p, n_matches, m, 0);
     regfree(&regex);
-    if (match) { return 0; }
+    if (match) { return -1; }
     sprintf(path, ".%.*s", (int)(m[1].rm_eo - m[1].rm_so), &headers[m[1].rm_so]);
     return 1;
 }

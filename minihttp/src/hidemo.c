@@ -184,7 +184,6 @@ HI_VOID* VENC_GetVencStreamProc(HI_VOID *p) {
 static pthread_t gs_VencPid;
 
 int main(int argc, char *argv[]) {
-    // init_fnlog("log_s.txt", "log_ss.txt");
 
     start_server();
 
@@ -592,6 +591,8 @@ int main(int argc, char *argv[]) {
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Exit faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
     s32Ret = HI_MPI_VB_Exit();
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VB_Exit faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
+
+    UnloadSensorLibrary();
 
     printf("Run stop_server..\n");
     stop_server();
