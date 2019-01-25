@@ -14,16 +14,26 @@
 int keepRunning = 1; // keep running infinite loop while true
 
 // pump fds from video thread to http thread
-int read_pump_fd = -1;
-int write_pump_fd = -1;
+int read_pump_h264_fd = -1;
+int write_pump_h264_fd = -1;
 
-int mjpeg = 1;
+int read_pump_mjpeg_fd = -1;
+int write_pump_mjpeg_fd = -1;
+
+enum StreamType {
+    STREAM_H264,
+    STREAM_MJPEG
+};
+
+struct Client {
+    int socket_fd;
+    enum StreamType type;
+};
 
 // shared http video clients list
 #define MAX_CLIENTS 1024
-int client_fds[MAX_CLIENTS];
+struct Client client_fds[MAX_CLIENTS];
 pthread_mutex_t client_fds_mutex;
-
 
 void close_socket_fd(int socket_fd) {
     shutdown(socket_fd, SHUT_RDWR);
@@ -31,9 +41,9 @@ void close_socket_fd(int socket_fd) {
 }
 
 void free_client(int i) {
-    if (client_fds[i] < 0) return;
-    close_socket_fd(client_fds[i]);
-    client_fds[i] = -1;
+    if (client_fds[i].socket_fd < 0) return;
+    close_socket_fd(client_fds[i].socket_fd);
+    client_fds[i].socket_fd = -1;
 }
 
 int send_to_fd(int client_fd, char* buf, ssize_t size) {
@@ -48,11 +58,11 @@ int send_to_fd(int client_fd, char* buf, ssize_t size) {
 }
 
 int send_to_client(int i, char* buf, ssize_t size) {;
-    if (send_to_fd(client_fds[i], buf, size) < 0) { free_client(i); return -1; }
+    if (send_to_fd(client_fds[i].socket_fd, buf, size) < 0) { free_client(i); return -1; }
     return 0;
 }
 
-void *http_thread(void *vargp) {
+void *http_thread_h264(void *vargp) {
     int read_fd = *((int *) vargp);
     const int READ_BUF_SIZE = 256*1024;
     char buf[READ_BUF_SIZE + 2]; ssize_t size;
@@ -64,7 +74,8 @@ void *http_thread(void *vargp) {
 
         pthread_mutex_lock(&client_fds_mutex);
         for (uint32_t i = 0; i < MAX_CLIENTS; ++i) {
-            if (client_fds[i] < 0) continue;
+            if (client_fds[i].socket_fd < 0) continue;
+            if (client_fds[i].type != STREAM_H264) continue;
             if (send_to_client(i, len_buf, len_size) < 0) continue; // send <SIZE>\r\n
             if (send_to_client(i, buf, size) < 0) continue; // send <DATA>\r\n
         }
@@ -74,18 +85,18 @@ void *http_thread(void *vargp) {
     pthread_mutex_lock(&client_fds_mutex);
     char end[] = "0\r\n\r\n";
     for (uint32_t i = 0; i < MAX_CLIENTS; ++i) {
-        if (client_fds[i] > 0) {
-            // send 0\r\n\r\n
-            if (send_to_client(i, end, sizeof(end)) < 0) continue;
-            free_client(i);
-        }
+        if (client_fds[i].socket_fd < 0) continue;
+        if (client_fds[i].type != STREAM_H264) continue;
+        // send 0\r\n\r\n
+        if (send_to_client(i, end, sizeof(end)) < 0) continue;
+        free_client(i);
     }
     pthread_mutex_unlock(&client_fds_mutex);
     printf("Shutdown http thread\n");
     return NULL;
 }
 
-void *mjpg_http_thread(void *vargp) {
+void *http_thread_mjpeg(void *vargp) {
     int read_fd = *((int *) vargp);
 
     const int READ_BUF_SIZE = 5*1024*1024;
@@ -100,7 +111,8 @@ void *mjpg_http_thread(void *vargp) {
 
         pthread_mutex_lock(&client_fds_mutex);
         for (uint32_t i = 0; i < MAX_CLIENTS; ++i) {
-            if (client_fds[i] < 0) continue;
+            if (client_fds[i].socket_fd < 0) continue;
+            if (client_fds[i].type != STREAM_MJPEG) continue;
             if (send_to_client(i, prefix_buf, prefix_size) < 0) continue; // send <SIZE>\r\n
             if (send_to_client(i, buf, size) < 0) continue; // send <DATA>\r\n
         }
@@ -141,18 +153,19 @@ int send_file(const int client_fd, const char *path) {
 
 int send_mjpeg_html(const int client_fd) {
     char html[] = "<html>\n"
-                "    <head>\n"
-                "        <title>MJPG-Streamer - Stream Example</title>\n"
-                "    </head>\n"
-                "    <body>\n"
-                "        <center>\n"
-                "            <img src=\"h264\" />\n"
-                "        </center>\n"
-                "    </body>\n"
-                "</html>";
-    char buf[256*1024];
+                  "    <head>\n"
+                  "        <title>MJPG-Streamer - Stream Example</title>\n"
+                  "    </head>\n"
+                  "    <body>\n"
+                  "        <center>\n"
+                  "            <img src=\"mjpeg\" />\n"
+                  "        </center>\n"
+                  "    </body>\n"
+                  "</html>";
+    char buf[1024];
     int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %zX\r\nConnection: close\r\n\r\n%s", strlen(html), html);
-    send_to_fd(client_fd, buf, buf_len); // zero ending string!
+    buf[buf_len++] = 0;
+    send_to_fd(client_fd, buf, buf_len);
     close_socket_fd(client_fd);
     return 1;
 }
@@ -211,17 +224,24 @@ void *server_thread(void *vargp) {
         // if h264 stream is requested add client_fd socket to client_fds array and send h264 stream with http_thread
         if (strcmp(path, "./h264") == 0) {
             char header[256];
-            if (mjpeg) {
-                int header_len = sprintf(header, "HTTP/1.0 200 OK\r\nCache-Control: no-cache\r\nPragma: no-cache\r\nConnection: close\r\nContent-Type: multipart/x-mixed-replace; boundary=boundarydonotcross\r\n\r\n");
-                send_to_fd(client_fd, header, header_len);
-            } else {
-                char *mime = "text/plain"; // application/octet-stream
-                int header_len = sprintf(header, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n", mime);
-                send_to_fd(client_fd, header, header_len);
-            }
+            char *mime = "text/plain"; // application/octet-stream
+            int header_len = sprintf(header, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n", mime);
+            send_to_fd(client_fd, header, header_len);
             pthread_mutex_lock(&client_fds_mutex);
             for (uint32_t i = 0; i < MAX_CLIENTS; ++i)
-                if (client_fds[i] < 0) { client_fds[i] = client_fd; break; }
+                if (client_fds[i].socket_fd < 0) { client_fds[i].socket_fd = client_fd; client_fds[i].type = STREAM_H264; break; }
+            pthread_mutex_unlock(&client_fds_mutex);
+            continue;
+        }
+
+        // if mjpeg stream is requested add client_fd socket to client_fds array and send mjpeg stream with http_thread
+        if (strcmp(path, "./mjpeg") == 0) {
+            char header[256];
+            int header_len = sprintf(header, "HTTP/1.0 200 OK\r\nCache-Control: no-cache\r\nPragma: no-cache\r\nConnection: close\r\nContent-Type: multipart/x-mixed-replace; boundary=boundarydonotcross\r\n\r\n");
+            send_to_fd(client_fd, header, header_len);
+            pthread_mutex_lock(&client_fds_mutex);
+            for (uint32_t i = 0; i < MAX_CLIENTS; ++i)
+                if (client_fds[i].socket_fd < 0) { client_fds[i].socket_fd = client_fd; client_fds[i].type = STREAM_MJPEG; break; }
             pthread_mutex_unlock(&client_fds_mutex);
             continue;
         }
@@ -241,7 +261,7 @@ void epipe_handler(int signo) { printf("EPIPE\n"); }
 void spipe_handler(int signo) { printf("SIGPIPE\n"); }
 
 int server_fd = -1;
-pthread_t server_thread_id, http_thread_id;
+pthread_t server_thread_id, http_thread_h264_id, http_thread_mjpeg_id;
 
 int start_server() {
     if (signal(SIGINT,  sig_handler) == SIG_ERR) printf("Error: can't catch SIGINT\n");
@@ -254,32 +274,36 @@ int start_server() {
     // init pump pipe
     int pump_fd[2];
     if (pipe(pump_fd) == -1) { printf("%s", strerror(errno)); return EXIT_FAILURE; }
-    read_pump_fd = pump_fd[0];
-    write_pump_fd = pump_fd[1];
+    read_pump_h264_fd = pump_fd[0];
+    write_pump_h264_fd = pump_fd[1];
+    if (pipe(pump_fd) == -1) { printf("%s", strerror(errno)); return EXIT_FAILURE; }
+    read_pump_mjpeg_fd = pump_fd[0];
+    write_pump_mjpeg_fd = pump_fd[1];
 
     // set clients_fds list to -1
-    for (uint32_t i = 0; i < MAX_CLIENTS; ++i) client_fds[i] = -1;
+    for (uint32_t i = 0; i < MAX_CLIENTS; ++i) { client_fds[i].socket_fd = -1; client_fds[i].type = -1; }
     pthread_mutex_init(&client_fds_mutex, NULL);
 
     // start server and http video stream threads
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     pthread_create(&server_thread_id, NULL, server_thread, (void *) &server_fd);
-    if (mjpeg) {
-        pthread_create(&http_thread_id, NULL, mjpg_http_thread, (void *) &read_pump_fd);
-    } else {
-        pthread_create(&http_thread_id, NULL, http_thread, (void *) &read_pump_fd);
-    }
+
+    pthread_create(&http_thread_h264_id, NULL, http_thread_h264, (void *) &read_pump_h264_fd);
+    pthread_create(&http_thread_mjpeg_id, NULL, http_thread_mjpeg, (void *) &read_pump_mjpeg_fd);
+
     return EXIT_SUCCESS;
 }
 
 int stop_server() {
     keepRunning = 0;
-    close(read_pump_fd); close(write_pump_fd);
+    close(read_pump_h264_fd); close(write_pump_h264_fd);
+    close(read_pump_mjpeg_fd); close(write_pump_mjpeg_fd);
 
     // stop server_thread while server_fd is closed
     close_socket_fd(server_fd);
     pthread_join(server_thread_id, NULL);
-    pthread_join(http_thread_id, NULL);
+    pthread_join(http_thread_h264_id, NULL);
+    pthread_join(http_thread_mjpeg_id, NULL);
 
     pthread_mutex_destroy(&client_fds_mutex);
     printf("Shutdown server\n");

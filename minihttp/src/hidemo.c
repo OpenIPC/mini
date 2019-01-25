@@ -75,7 +75,7 @@ HI_S32 VENC_GetFilePostfix(PAYLOAD_TYPE_E enPayload, char *szFilePostfix) {
 HI_S32 VENC_SaveH264(FILE* fpH264File, VENC_STREAM_S *pstStream) {
     HI_S32 i;
     for (i = 0; i < pstStream->u32PackCount; i++) {
-        write(write_pump_fd, pstStream->pstPack[i].pu8Addr + pstStream->pstPack[i].u32Offset, pstStream->pstPack[i].u32Len - pstStream->pstPack[i].u32Offset);
+        write(write_pump_h264_fd, pstStream->pstPack[i].pu8Addr + pstStream->pstPack[i].u32Offset, pstStream->pstPack[i].u32Len - pstStream->pstPack[i].u32Offset);
         fwrite(pstStream->pstPack[i].pu8Addr+pstStream->pstPack[i].u32Offset, pstStream->pstPack[i].u32Len-pstStream->pstPack[i].u32Offset, 1, fpH264File);
         fflush(fpH264File);
     }
@@ -96,7 +96,7 @@ HI_S32 VENC_SaveMJpeg(FILE* fpMJpegFile, VENC_STREAM_S *pstStream) {
 //        fwrite(pstData->pu8Addr+pstData->u32Offset, pstData->u32Len-pstData->u32Offset, 1, fpMJpegFile);
 //        fflush(fpMJpegFile);
     }
-    write(write_pump_fd, mjpeg_buf, buf_size);
+    write(write_pump_mjpeg_fd, mjpeg_buf, buf_size);
     return HI_SUCCESS;
 }
 HI_S32 VENC_SaveStream(PAYLOAD_TYPE_E enType,FILE *pFd, VENC_STREAM_S *pstStream) {
@@ -451,11 +451,12 @@ int main(int argc, char *argv[]) {
     int picHeight = 1080;
     int frm_rate = 30;
 
-    VENC_CHN venc_chn = 0;
-    VENC_CHN_ATTR_S venc_chn_attr;
-    memset(&venc_chn_attr, 0, sizeof(VENC_CHN_ATTR_S));
 
-    if (mjpeg) {
+    {
+        VENC_CHN venc_chn = 0;
+        VENC_CHN_ATTR_S venc_chn_attr;
+        memset(&venc_chn_attr, 0, sizeof(VENC_CHN_ATTR_S));
+
         VENC_ATTR_MJPEG_S mjpeg_attr;
         memset(&mjpeg_attr, 0, sizeof(VENC_ATTR_MJPEG_S));
         mjpeg_attr.u32MaxPicWidth = picWidth;
@@ -473,7 +474,15 @@ int main(int argc, char *argv[]) {
         venc_chn_attr.stRcAttr.stAttrMjpegeCbr.fr32DstFrmRate = frm_rate;
         venc_chn_attr.stRcAttr.stAttrMjpegeCbr.u32FluctuateLevel = 0;
         venc_chn_attr.stRcAttr.stAttrMjpegeCbr.u32BitRate = 1024 * 10 * 3;
-    } else {
+        s32Ret = HI_MPI_VENC_CreateChn(venc_chn, &venc_chn_attr);
+        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_CreateChn faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
+    }
+
+    {
+        VENC_CHN venc_chn = 1;
+        VENC_CHN_ATTR_S venc_chn_attr;
+        memset(&venc_chn_attr, 0, sizeof(VENC_CHN_ATTR_S));
+
         VENC_ATTR_H264_S h264_attr;
         memset(&h264_attr, 0, sizeof(VENC_ATTR_H264_S));
         h264_attr.u32MaxPicWidth = picWidth;
@@ -499,10 +508,9 @@ int main(int argc, char *argv[]) {
         venc_chn_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264CBR;
         venc_chn_attr.stVeAttr.stAttrH264e = h264_attr;
         venc_chn_attr.stRcAttr.stAttrH264Cbr = h264_cbr;
+        s32Ret = HI_MPI_VENC_CreateChn(venc_chn, &venc_chn_attr);
+        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_CreateChn faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
     }
-
-    s32Ret = HI_MPI_VENC_CreateChn(venc_chn, &venc_chn_attr);
-    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_CreateChn faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
 
     {
         MPP_CHN_S src_chn;
@@ -520,7 +528,27 @@ int main(int argc, char *argv[]) {
         if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind faild with %#x!\n", s32Ret); return HI_FAILURE; }
     }
 
-    s32Ret = HI_MPI_VENC_StartRecvPic(venc_chn);
+
+    {
+        MPP_CHN_S src_chn;
+        memset(&src_chn, 0, sizeof(MPP_CHN_S));
+        src_chn.enModId = HI_ID_VPSS;
+        src_chn.s32DevId = 0;
+        src_chn.s32ChnId = 0;
+        MPP_CHN_S dest_chn;
+        memset(&dest_chn, 0, sizeof(MPP_CHN_S));
+        dest_chn.enModId = HI_ID_VENC;
+        dest_chn.s32DevId = 0;
+        dest_chn.s32ChnId = 1;
+
+        s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
+        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind faild with %#x!\n", s32Ret); return HI_FAILURE; }
+    }
+
+    s32Ret = HI_MPI_VENC_StartRecvPic(0);
+    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_StartRecvPic faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
+
+    s32Ret = HI_MPI_VENC_StartRecvPic(1);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_StartRecvPic faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
 
     pthread_create(&gs_VencPid, 0, VENC_GetVencStreamProc, NULL);
@@ -540,9 +568,26 @@ int main(int argc, char *argv[]) {
         if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_UnBind faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
     }
 
-    s32Ret = HI_MPI_VENC_StopRecvPic(venc_chn);
+    {
+        MPP_CHN_S src_chn;
+        src_chn.enModId = HI_ID_VPSS;
+        src_chn.s32DevId = 0;
+        src_chn.s32ChnId = 0;
+        MPP_CHN_S dest_chn;
+        dest_chn.enModId = HI_ID_VENC;
+        dest_chn.s32DevId = 0;
+        dest_chn.s32ChnId = 1;
+        s32Ret = HI_MPI_SYS_UnBind(&src_chn, &dest_chn);
+        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_UnBind faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
+    }
+
+    s32Ret = HI_MPI_VENC_StopRecvPic(0);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_StopRecvPic faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
-    s32Ret = HI_MPI_VENC_DestroyChn(venc_chn);
+    s32Ret = HI_MPI_VENC_DestroyChn(0);
+    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_DestroyChn faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
+    s32Ret = HI_MPI_VENC_StopRecvPic(1);
+    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_StopRecvPic faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
+    s32Ret = HI_MPI_VENC_DestroyChn(1);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_DestroyChn faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
     s32Ret = HI_MPI_VPSS_DisableChn(vpss_grp, vpss_chn);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_DisableChn faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
