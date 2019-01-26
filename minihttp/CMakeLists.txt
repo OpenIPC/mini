@@ -8,32 +8,35 @@ include_directories(
     ./include   # HISDK headers
 )
 
-
 set(HILIBS
-    isp         # ISP_AlgRegisterDehaze
-    # sns_imx222  # sensor_register_callback / sensor_unregister_callback
-    _hiae       # HI_MPI_AE_Register/HI_MPI_AE_UnRegister, HI_MPI_AE_SensorRegCallBack/HI_MPI_AE_SensorUnRegCallBack
-    _hiawb      # HI_MPI_AWB_Register/HI_MPI_AWB_UnRegister, HI_MPI_AWB_SensorRegCallBack/HI_MPI_AWB_SensorUnRegCallBack
-    _hiaf       # HI_MPI_AF_Register/HI_MPI_AF_UnRegister
-    _hidefog    # ISP_AlgRegisterDehaze
+    isp _hiae _hiawb _hiaf _hidefog
     pthread m dl
-    ive         # HI_MPI_IVE_DMA, HI_MPI_IVE_Query, ISP_AlgRegisterDehaze
-    md          # ISP_AlgRegisterDehaze
-    mpi
-    tde         # ISP_AlgRegisterDehaze
-    upvqe       # HI_UPVQE_Create/HI_UPVQE_Destroy, HI_UPVQE_ReadFrame/HI_UPVQE_WriteFrame, HI_UPVQE_GetVolume/HI_UPVQE_SetVolume, HI_UPVQE_GetConfig
-    dnvqe       # ISP_AlgRegisterDehaze, HI_DNVQE_Create/HI_DNVQE_Destroy, HI_DNVQE_ReadFrame/HI_DNVQE_WriteFrame, HI_DNVQE_GetConfig
-    VoiceEngine # ISP_AlgRegisterDehaze, HI_VOICE_EncodeFrame/HI_VOICE_DecodeFrame, HI_VOICE_EncReset/HI_VOICE_DecReset
-    # slice_trans
+    ive md mpi tde upvqe dnvqe VoiceEngine
 )
 
-# add_executable(minihttp src/main.c src/tools.c)
 add_executable(minihttp
+    src/hidemo.h
     src/hidemo.c
+    src/hierrors.h
+    src/hierrors.c
+    src/tools.h
     src/tools.c
     src/stack.c
+    src/sensors.h
     src/sensors.c
+    src/server.h
     src/server.c
+    src/main.c
 )
 target_link_libraries(minihttp pthread ${HILIBS})
 install(TARGETS minihttp RUNTIME DESTINATION /usr/bin/)
+
+if(APPLE)
+    add_executable(test_config
+        src/test_config.c
+        src/tools.c
+        src/sensors.c
+    )
+    target_link_libraries(test_config pthread)
+    include(tests/CMakeLists.txt)
+endif()
