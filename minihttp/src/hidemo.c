@@ -1,55 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <sys/poll.h>
-#include <sys/time.h>
 #include <fcntl.h>
-#include <errno.h>
 #include <pthread.h>
-#include <math.h>
 #include <unistd.h>
 #include <signal.h>
-
-#include <hi_common.h>
-#include <hi_comm_sys.h>
-#include <hi_comm_vb.h>
-#include <hi_comm_isp.h>
-#include <hi_comm_vi.h>
-#include <hi_comm_vo.h>
-#include <hi_comm_venc.h>
-#include <hi_comm_vpss.h>
-#include <hi_comm_vdec.h>
-#include <hi_comm_region.h>
-#include <hi_comm_adec.h>
-#include <hi_comm_aenc.h>
-#include <hi_comm_ai.h>
-#include <hi_comm_ao.h>
-#include <hi_comm_aio.h>
-#include <hi_defines.h>
 
 #include <mpi_sys.h>
 #include <mpi_vb.h>
 #include <mpi_vi.h>
-#include <mpi_vo.h>
 #include <mpi_venc.h>
 #include <mpi_vpss.h>
-#include <mpi_vdec.h>
-#include <mpi_region.h>
-#include <mpi_adec.h>
-#include <mpi_aenc.h>
-#include <mpi_ai.h>
-#include <mpi_ao.h>
 #include <mpi_isp.h>
-#include <mpi_ive.h>
 #include <mpi_ae.h>
 #include <mpi_awb.h>
 #include <mpi_af.h>
-#include <hi_vreg.h>
-#include <hi_sns_ctrl.h>
-#include <hi_mipi.h>
 
 #include "sensors.h"
 #include "server.h"
@@ -123,7 +89,7 @@ HI_VOID* VENC_GetVencStreamProc(HI_VOID *p) {
     HI_S32 s32Ret;
     VENC_CHN VencChn;
     PAYLOAD_TYPE_E enPayLoadType[VENC_MAX_CHN_NUM];
-    s32ChnTotal = 1;
+    s32ChnTotal = 2;
 
     if (s32ChnTotal >= VENC_MAX_CHN_NUM) { printf("input count invaild\n"); return NULL; }
     for (i = 0; i < s32ChnTotal; i++) {
@@ -147,7 +113,7 @@ HI_VOID* VENC_GetVencStreamProc(HI_VOID *p) {
         FD_ZERO(&read_fds);
         for (i = 0; i < s32ChnTotal; i++) { FD_SET(VencFd[i], &read_fds); }
 
-        TimeoutVal.tv_sec  = 5;
+        TimeoutVal.tv_sec  = 2;
         TimeoutVal.tv_usec = 0;
         s32Ret = select(maxfd + 1, &read_fds, NULL, NULL, &TimeoutVal);
         if (s32Ret < 0) { printf("select failed!\n"); break; }
@@ -181,13 +147,23 @@ HI_VOID* VENC_GetVencStreamProc(HI_VOID *p) {
     return NULL;
 }
 
-static pthread_t gs_VencPid;
+pthread_t gs_VencPid = 0;
+pthread_t gs_IspPid = 0;
 
 int main(int argc, char *argv[]) {
 
-    start_server();
+    struct SensorConfig sensor_config;
+    if (parse_sensor_config("./configs/imx222_1080p_line.ini", &sensor_config)  < 0) {
+        printf("Can't load config\n");
+        return EXIT_FAILURE;
+    }
+    LoadSensorLibrary(sensor_config.dll_file);
 
-    LoadSensorLibrary("libsns_imx222.so");
+    unsigned int width = sensor_config.isp_w;
+    unsigned int height = sensor_config.isp_h;
+    unsigned int frame_rate = sensor_config.isp_frame_rate;
+
+    start_server();
 
     HI_MPI_SYS_Exit();
     HI_MPI_VB_Exit();
@@ -222,8 +198,8 @@ int main(int argc, char *argv[]) {
     /* mipi reset unrest */
     HI_S32 fd = open("/dev/hi_mipi", O_RDWR);
     if (fd < 0) { printf("warning: open hi_mipi dev failed\n"); return EXIT_FAILURE; }
-    combo_dev_attr_t MIPI_CMOS3V3_ATTR = { .input_mode = INPUT_MODE_CMOS_33V, { } };
-    if (ioctl(fd, _IOW('m', 0x01, combo_dev_attr_t), &MIPI_CMOS3V3_ATTR)) {
+    combo_dev_attr_t mipi_attr = { .input_mode = sensor_config.input_mode, { } };
+    if (ioctl(fd, _IOW('m', 0x01, combo_dev_attr_t), &mipi_attr)) {
         printf("set mipi attr failed\n");
         close(fd);
         return EXIT_FAILURE;
@@ -231,7 +207,6 @@ int main(int argc, char *argv[]) {
     close(fd);
 
     sensor_register_callback();
-
 
     ISP_DEV isp_dev = 0;
     ALG_LIB_S lib;
@@ -254,83 +229,69 @@ int main(int argc, char *argv[]) {
 
     ISP_WDR_MODE_S wdr_mode;
     memset(&wdr_mode,0,sizeof(ISP_WDR_MODE_S));
-    wdr_mode.enWDRMode = WDR_MODE_NONE;
+    wdr_mode.enWDRMode = sensor_config.mode;
     s32Ret = HI_MPI_ISP_SetWDRMode(isp_dev, &wdr_mode);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_ISP_SetWDRMode faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
 
     ISP_PUB_ATTR_S pub_attr;
     memset(&pub_attr,0,sizeof(ISP_PUB_ATTR_S));
-    pub_attr.enBayer = BAYER_RGGB;
-    pub_attr.f32FrameRate = 30.0;
-    pub_attr.stWndRect.s32X = 200;
-    pub_attr.stWndRect.s32Y = 20;
-    pub_attr.stWndRect.u32Width = 1920;
-    pub_attr.stWndRect.u32Height = 1080;
+    pub_attr.stWndRect.s32X = sensor_config.isp_x;
+    pub_attr.stWndRect.s32Y = sensor_config.isp_y;
+    pub_attr.stWndRect.u32Width = sensor_config.isp_w;
+    pub_attr.stWndRect.u32Height = sensor_config.isp_h;
+    pub_attr.f32FrameRate = sensor_config.isp_frame_rate;
+    pub_attr.enBayer = sensor_config.isp_bayer;
     s32Ret = HI_MPI_ISP_SetPubAttr(isp_dev, &pub_attr);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_ISP_SetPubAttr faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
 
     s32Ret = HI_MPI_ISP_Init(isp_dev);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_ISP_Init faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
 
-    pthread_t gs_IspPid = 0;
     if (0 != pthread_create(&gs_IspPid, 0, (void* (*)(void*))Test_ISP_Run, NULL)) { printf("%s: create isp running thread failed!\n", __FUNCTION__); return EXIT_FAILURE; }
     usleep(1000);
-
-
 
     VI_DEV vi_dev = 0;
     VI_DEV_ATTR_S vi_dev_attr;
     memset(&vi_dev_attr,0,sizeof(VI_DEV_ATTR_S));
     vi_dev_attr.enIntfMode = VI_MODE_DIGITAL_CAMERA;
-    vi_dev_attr.enWorkMode = VI_WORK_MODE_1Multiplex;
-    vi_dev_attr.au32CompMask[0] = 0x3FF0000;
-    vi_dev_attr.au32CompMask[1] = 0x0;
-    vi_dev_attr.enScanMode = VI_SCAN_PROGRESSIVE;
+    vi_dev_attr.enWorkMode = sensor_config.videv.work_mod;
+    vi_dev_attr.au32CompMask[0] = sensor_config.videv.mask_0;
+    vi_dev_attr.au32CompMask[1] = sensor_config.videv.mask_1;
+    vi_dev_attr.enScanMode = sensor_config.videv.scan_mode;
     vi_dev_attr.s32AdChnId[0] = -1;
     vi_dev_attr.s32AdChnId[1] = -1;
     vi_dev_attr.s32AdChnId[2] = -1;
     vi_dev_attr.s32AdChnId[3] = -1;
-    vi_dev_attr.stDevRect.s32X = 0;
-    vi_dev_attr.stDevRect.s32Y = 0;
-    vi_dev_attr.stDevRect.u32Width = 1920;
-    vi_dev_attr.stDevRect.u32Height = 1080;
-    vi_dev_attr.enDataSeq = VI_INPUT_DATA_YUYV;
-    vi_dev_attr.stSynCfg.enVsync = VI_VSYNC_PULSE;
-    vi_dev_attr.stSynCfg.enVsyncNeg = VI_VSYNC_NEG_HIGH;
-    vi_dev_attr.stSynCfg.enHsync = VI_HSYNC_VALID_SINGNAL;
-    vi_dev_attr.stSynCfg.enHsyncNeg = VI_HSYNC_NEG_HIGH;
-    vi_dev_attr.stSynCfg.enVsyncValid = VI_VSYNC_VALID_SINGAL;
-    vi_dev_attr.stSynCfg.enVsyncValidNeg = VI_VSYNC_VALID_NEG_HIGH;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32HsyncHfb = 0;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32HsyncAct = 1920;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32HsyncHbb = 0;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVfb = 0;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVact = 1080;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVbb = 0;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVbfb = 0;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVbact = 0;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVbbb = 0;
-    vi_dev_attr.enDataPath = VI_PATH_ISP;
-    vi_dev_attr.enInputDataType = VI_DATA_TYPE_RGB;
-    vi_dev_attr.bDataRev = HI_FALSE;
-    vi_dev_attr.stDevRect.s32X = 200;
-    vi_dev_attr.stDevRect.s32Y = 20;
-    vi_dev_attr.stDevRect.u32Width = 1920;
-    vi_dev_attr.stDevRect.u32Height = 1080;
+    vi_dev_attr.enDataSeq = sensor_config.videv.data_seq;
+    vi_dev_attr.stSynCfg.enVsync = sensor_config.videv.vsync;
+    vi_dev_attr.stSynCfg.enVsyncNeg = sensor_config.videv.vsync_neg;
+    vi_dev_attr.stSynCfg.enHsync = sensor_config.videv.hsync;
+    vi_dev_attr.stSynCfg.enHsyncNeg = sensor_config.videv.hsync_neg;
+    vi_dev_attr.stSynCfg.enVsyncValid = sensor_config.videv.vsync_valid;
+    vi_dev_attr.stSynCfg.enVsyncValidNeg = sensor_config.videv.vsync_valid_neg;
+    vi_dev_attr.stSynCfg.stTimingBlank.u32HsyncHfb = sensor_config.videv.timing_blank_hsync_hfb;
+    vi_dev_attr.stSynCfg.stTimingBlank.u32HsyncAct = sensor_config.videv.timing_blank_hsync_act;
+    vi_dev_attr.stSynCfg.stTimingBlank.u32HsyncHbb = sensor_config.videv.timing_blank_hsync_hbb;
+    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVfb = sensor_config.videv.timing_blank_vsync_vfb;
+    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVact = sensor_config.videv.timing_blank_vsync_vact;
+    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVbb = sensor_config.videv.timing_blank_vsync_vbb;
+    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVbfb = sensor_config.videv.timing_blank_vsync_vbfb;
+    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVbact = sensor_config.videv.timing_blank_vsync_vbact;
+    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVbbb = sensor_config.videv.timing_blank_vsync_vbbb;
+    vi_dev_attr.enDataPath = sensor_config.videv.data_path;
+    vi_dev_attr.enInputDataType = sensor_config.videv.input_data_type;
+    vi_dev_attr.bDataRev = sensor_config.videv.data_rev;
+    vi_dev_attr.stDevRect.s32X = sensor_config.videv.dev_rect_x;
+    vi_dev_attr.stDevRect.s32Y = sensor_config.videv.dev_rect_y;
+    vi_dev_attr.stDevRect.u32Width = sensor_config.videv.dev_rect_w;
+    vi_dev_attr.stDevRect.u32Height = sensor_config.videv.dev_rect_h;
 
     s32Ret = HI_MPI_VI_SetDevAttr(vi_dev, &vi_dev_attr);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VI_SetDevAttr faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
 
-//    ISP_WDR_MODE_S wdr_mode;
-//    memset(&wdr_mode,0,sizeof(ISP_WDR_MODE_S));
-//    wdr_mode.enWDRMode = WDR_MODE_NONE;
-    s32Ret = HI_MPI_ISP_GetWDRMode(isp_dev, &wdr_mode);
-    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_ISP_GetWDRMode faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
-
-    // TODO
 
     VI_WDR_ATTR_S wdr_addr;
-    memset(&wdr_addr,0,sizeof(VI_WDR_ATTR_S));
+    memset(&wdr_addr, 0, sizeof(VI_WDR_ATTR_S));
     wdr_addr.enWDRMode = WDR_MODE_NONE;
     wdr_addr.bCompress = HI_FALSE;
     s32Ret = HI_MPI_VI_SetWDRAttr(vi_dev, &wdr_addr);
@@ -344,10 +305,10 @@ int main(int argc, char *argv[]) {
     memset(&chn_attr,0,sizeof(VI_CHN_ATTR_S));
     chn_attr.stCapRect.s32X = 0;
     chn_attr.stCapRect.s32Y = 0;
-    chn_attr.stCapRect.u32Width = 1920;
-    chn_attr.stCapRect.u32Height = 1080;
-    chn_attr.stDestSize.u32Width = 1920;
-    chn_attr.stDestSize.u32Height = 1080;
+    chn_attr.stCapRect.u32Width = width;
+    chn_attr.stCapRect.u32Height = height;
+    chn_attr.stDestSize.u32Width = width;
+    chn_attr.stDestSize.u32Height = height;
     chn_attr.enCapSel = VI_CAPSEL_BOTH;
     chn_attr.enPixFormat = PIXEL_FORMAT_YUV_SEMIPLANAR_420;
     chn_attr.bMirror = HI_FALSE;
@@ -364,8 +325,8 @@ int main(int argc, char *argv[]) {
     VPSS_GRP vpss_grp = 0;
     VPSS_GRP_ATTR_S vpss_grp_attr;
     memset(&vpss_grp_attr,0,sizeof(VPSS_GRP_ATTR_S));
-    vpss_grp_attr.u32MaxW = 1920;
-    vpss_grp_attr.u32MaxH = 1080;
+    vpss_grp_attr.u32MaxW = width;
+    vpss_grp_attr.u32MaxH = height;
     vpss_grp_attr.enPixFmt = PIXEL_FORMAT_YUV_SEMIPLANAR_420;
     vpss_grp_attr.bIeEn = HI_FALSE;
     vpss_grp_attr.bDciEn = HI_FALSE;
@@ -375,42 +336,21 @@ int main(int argc, char *argv[]) {
     s32Ret = HI_MPI_VPSS_CreateGrp(vpss_grp, &vpss_grp_attr);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_CreateGrp faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
 
-    VPSS_NR_PARAM_U nr_param;
-    memset(&nr_param,0,sizeof(VPSS_NR_PARAM_U));
-    s32Ret = HI_MPI_VPSS_GetNRParam(vpss_grp, &nr_param);
-    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_GetNRParam faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
-
-    nr_param.stNRParam_V1.s32YPKStr = 0;
-    nr_param.stNRParam_V1.s32YSFStr = 100;
-    nr_param.stNRParam_V1.s32YTFStr = 64;
-    nr_param.stNRParam_V1.s32TFStrMax = 12;
-    nr_param.stNRParam_V1.s32TFStrMov = 0;
-    nr_param.stNRParam_V1.s32YSmthStr = 0;
-    nr_param.stNRParam_V1.s32YSmthRat = 16;
-    nr_param.stNRParam_V1.s32YSFStrDlt = 0;
-    nr_param.stNRParam_V1.s32YSFStrDl = 0;
-    nr_param.stNRParam_V1.s32YTFStrDlt = 0;
-    nr_param.stNRParam_V1.s32YTFStrDl = 0;
-    nr_param.stNRParam_V1.s32YSFBriRat = 24;
-    nr_param.stNRParam_V1.s32CSFStr = 32;
-    nr_param.stNRParam_V1.s32CTFstr = 0;
-    nr_param.stNRParam_V1.s32YTFMdWin = 1;
-    s32Ret = HI_MPI_VPSS_SetNRParam(vpss_grp, &nr_param);
-    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_SetNRParam faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
-
     s32Ret = HI_MPI_VPSS_StartGrp(vpss_grp);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_StartGrp faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
 
-    MPP_CHN_S src_chn;
-    src_chn.enModId = HI_ID_VIU;
-    src_chn.s32DevId = 0;
-    src_chn.s32ChnId = 0;
-    MPP_CHN_S dest_chn;
-    dest_chn.enModId = HI_ID_VPSS;
-    dest_chn.s32DevId = 0;
-    dest_chn.s32ChnId = 0;
-    s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
-    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
+    {
+        MPP_CHN_S src_chn;
+        src_chn.enModId = HI_ID_VIU;
+        src_chn.s32DevId = 0;
+        src_chn.s32ChnId = 0;
+        MPP_CHN_S dest_chn;
+        dest_chn.enModId = HI_ID_VPSS;
+        dest_chn.s32DevId = 0;
+        dest_chn.s32ChnId = 0;
+        s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
+        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
+    }
 
     VPSS_CHN vpss_chn = 0;
     VPSS_CHN_ATTR_S vpss_chn_attr;
@@ -432,8 +372,8 @@ int main(int argc, char *argv[]) {
     VPSS_CHN_MODE_S vpss_chn_mode;
     memset(&vpss_chn_mode,0,sizeof(VPSS_CHN_MODE_S));
     vpss_chn_mode.enChnMode = VPSS_CHN_MODE_USER;
-    vpss_chn_mode.u32Width = 1920;
-    vpss_chn_mode.u32Height = 1080;
+    vpss_chn_mode.u32Width = width;
+    vpss_chn_mode.u32Height = height;
     vpss_chn_mode.bDouble = HI_FALSE;
     vpss_chn_mode.enPixelFormat = PIXEL_FORMAT_YUV_SEMIPLANAR_420;
     vpss_chn_mode.enCompressMode = COMPRESS_MODE_NONE;
@@ -443,15 +383,7 @@ int main(int argc, char *argv[]) {
     s32Ret = HI_MPI_VPSS_EnableChn(vpss_grp, vpss_chn);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_EnableChn faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
 
-
-
     // config venc
-
-    int picWidth = 1920;
-    int picHeight = 1080;
-    int frm_rate = 30;
-
-
     {
         VENC_CHN venc_chn = 0;
         VENC_CHN_ATTR_S venc_chn_attr;
@@ -459,19 +391,19 @@ int main(int argc, char *argv[]) {
 
         VENC_ATTR_MJPEG_S mjpeg_attr;
         memset(&mjpeg_attr, 0, sizeof(VENC_ATTR_MJPEG_S));
-        mjpeg_attr.u32MaxPicWidth = picWidth;
-        mjpeg_attr.u32MaxPicHeight = picHeight;
-        mjpeg_attr.u32PicWidth = picWidth;
-        mjpeg_attr.u32PicHeight = picHeight;
-        mjpeg_attr.u32BufSize = (((picWidth + 15) >> 4) << 4) * (((picHeight + 15) >> 4) << 4);
+        mjpeg_attr.u32MaxPicWidth = width;
+        mjpeg_attr.u32MaxPicHeight = height;
+        mjpeg_attr.u32PicWidth = width;
+        mjpeg_attr.u32PicHeight = height;
+        mjpeg_attr.u32BufSize = (((width + 15) >> 4) << 4) * (((height + 15) >> 4) << 4);
         mjpeg_attr.bByFrame = HI_TRUE;  /*get stream mode is field mode  or frame mode*/
 
         venc_chn_attr.stVeAttr.enType = PT_MJPEG;
         memcpy(&venc_chn_attr.stVeAttr.stAttrMjpeg, &mjpeg_attr, sizeof(VENC_ATTR_MJPEG_S));
         venc_chn_attr.stRcAttr.enRcMode = VENC_RC_MODE_MJPEGCBR;
         venc_chn_attr.stRcAttr.stAttrMjpegeCbr.u32StatTime = 1;
-        venc_chn_attr.stRcAttr.stAttrMjpegeCbr.u32SrcFrmRate = frm_rate;
-        venc_chn_attr.stRcAttr.stAttrMjpegeCbr.fr32DstFrmRate = frm_rate;
+        venc_chn_attr.stRcAttr.stAttrMjpegeCbr.u32SrcFrmRate = frame_rate;
+        venc_chn_attr.stRcAttr.stAttrMjpegeCbr.fr32DstFrmRate = frame_rate;
         venc_chn_attr.stRcAttr.stAttrMjpegeCbr.u32FluctuateLevel = 0;
         venc_chn_attr.stRcAttr.stAttrMjpegeCbr.u32BitRate = 1024 * 10 * 3;
         s32Ret = HI_MPI_VENC_CreateChn(venc_chn, &venc_chn_attr);
@@ -485,11 +417,11 @@ int main(int argc, char *argv[]) {
 
         VENC_ATTR_H264_S h264_attr;
         memset(&h264_attr, 0, sizeof(VENC_ATTR_H264_S));
-        h264_attr.u32MaxPicWidth = picWidth;
-        h264_attr.u32MaxPicHeight = picHeight;
-        h264_attr.u32PicWidth = picWidth;/*the picture width*/
-        h264_attr.u32PicHeight = picHeight;/*the picture height*/
-        h264_attr.u32BufSize  = picWidth * picHeight;/*stream buffer size*/
+        h264_attr.u32MaxPicWidth = width;
+        h264_attr.u32MaxPicHeight = height;
+        h264_attr.u32PicWidth = width;/*the picture width*/
+        h264_attr.u32PicHeight = height;/*the picture height*/
+        h264_attr.u32BufSize  = width * height;/*stream buffer size*/
         h264_attr.u32Profile  = 0;/*0: baseline; 1:MP; 2:HP;  3:svc_t */
         h264_attr.bByFrame = HI_TRUE;/*get stream mode is slice mode or frame mode?*/
         h264_attr.u32BFrameNum = 0;/* 0: not support B frame; >=1: number of B frames */
@@ -497,10 +429,10 @@ int main(int argc, char *argv[]) {
 
         VENC_ATTR_H264_CBR_S h264_cbr;
         memset(&h264_cbr, 0, sizeof(VENC_ATTR_H264_CBR_S));
-        h264_cbr.u32Gop            = frm_rate;
+        h264_cbr.u32Gop            = frame_rate;
         h264_cbr.u32StatTime       = 1; /* stream rate statics time(s) */
-        h264_cbr.u32SrcFrmRate      = frm_rate;/* input (vi) frame rate */
-        h264_cbr.fr32DstFrmRate = frm_rate;/* target frame rate */
+        h264_cbr.u32SrcFrmRate      = frame_rate;/* input (vi) frame rate */
+        h264_cbr.fr32DstFrmRate = frame_rate;/* target frame rate */
         h264_cbr.u32BitRate = 1024*4;
         h264_cbr.u32FluctuateLevel = 0; /* average bit rate */
 
@@ -527,8 +459,6 @@ int main(int argc, char *argv[]) {
         s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
         if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind faild with %#x!\n", s32Ret); return HI_FAILURE; }
     }
-
-
     {
         MPP_CHN_S src_chn;
         memset(&src_chn, 0, sizeof(MPP_CHN_S));
@@ -567,7 +497,6 @@ int main(int argc, char *argv[]) {
         s32Ret = HI_MPI_SYS_UnBind(&src_chn, &dest_chn);
         if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_UnBind faild with %#x!\n", s32Ret); return EXIT_FAILURE; }
     }
-
     {
         MPP_CHN_S src_chn;
         src_chn.enModId = HI_ID_VPSS;

@@ -181,7 +181,7 @@ int parse_config_lvds(const char *str, struct SensorLVDS *lvds) {
     return 1;
 }
 
-int parse_config_videv(const char *str, struct SensorConfig *config) {
+int parse_config_videv(const char *str, struct SensorVIDEV *config) {
     {
         const char* possible_values[] = { "VI_INPUT_MODE_BT656", "VI_INPUT_MODE_BT601", "VI_INPUT_MODE_DIGITAL_CAMERA", "VI_INPUT_MODE_INTERLEAVED", "VI_INPUT_MODE_MIPI", "VI_INPUT_MODE_LVDS", "VI_INPUT_MODE_HISPI" };
         const int count = sizeof(possible_values) / sizeof(const char *);
@@ -216,9 +216,13 @@ int parse_config_videv(const char *str, struct SensorConfig *config) {
         if (parseEnum(str, "Scan_mode", (void *)&config->scan_mode,  possible_values, count, 0) < 0) return -1;
     }
     {
-        const char* possible_values[] = { "VI_INPUT_DATA_VUVU", "VI_INPUT_DATA_UVUV", "VI_INPUT_DATA_UYVY", "VI_INPUT_DATA_VYUY", "VI_INPUT_DATA_YUYV", "VI_INPUT_DATA_YVYU" };
+        const char* possible_values[] = { "VI_INPUT_DATA_VUVU", "VI_INPUT_DATA_UVUV" };
         const int count = sizeof(possible_values) / sizeof(const char *);
-        if (parseEnum(str, "Data_seq", (void *)&config->data_seq,  possible_values, count, 0) < 0) return -1;
+        if (parseEnum(str, "Data_seq", (void *)&config->data_seq,  possible_values, count, 0) < 0) {
+            const char* possible_values[] = { "VI_INPUT_DATA_UYVY", "VI_INPUT_DATA_VYUY", "VI_INPUT_DATA_YUYV", "VI_INPUT_DATA_YVYU" };
+            const int count = sizeof(possible_values) / sizeof(const char *);
+            if (parseEnum(str, "Data_seq", (void *)&config->data_seq,  possible_values, count, 0) < 0) return -1;
+        }
     }
     {
         const char* possible_values[] = { "VI_VSYNC_FIELD", "VI_VSYNC_PULSE" };
@@ -374,9 +378,9 @@ int parse_sensor_config(const char *path, struct SensorConfig *config) {
             "RAW_DATA_8BIT", "RAW_DATA_10BIT", "RAW_DATA_12BIT", "RAW_DATA_14BIT"
         };
         const int count = sizeof(possible_values) / sizeof(const char *);
-        if (parseEnum(str, "data_type", (void *)&config->data_type,  possible_values, count, 1) < 0) goto RET_ERR;
+        if (parseEnum(str, "data_type", (void *)&config->mipi.data_type,  possible_values, count, 1) < 0) goto RET_ERR;
     }
-    if (parseArray(str, "lane_id", &config->lane_id, 8) < 0) goto RET_ERR;
+    if (parseArray(str, "lane_id", &config->mipi.lane_id, 8) < 0) goto RET_ERR;
 
     // [lvds]
     if (parse_config_lvds(str, &config->lvds) < 0) goto RET_ERR;
@@ -394,7 +398,7 @@ int parse_sensor_config(const char *path, struct SensorConfig *config) {
     }
 
     // [vi_dev]
-    if (parse_config_videv(str, config) < 0) goto RET_ERR;
+    if (parse_config_videv(str, &config->videv) < 0) goto RET_ERR;
     // [vi_chn]
     if (parse_config_vichn(str, config) < 0) goto RET_ERR;
 
