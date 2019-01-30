@@ -21,6 +21,8 @@ void UnloadSensorLibrary();
 int sensor_register_callback(void);
 int sensor_unregister_callback(void);
 
+
+
 struct SensorMIPI {
     raw_data_type_e data_type;
     int lane_id[8];
@@ -86,6 +88,31 @@ struct SensorVIDEV {
     unsigned int dev_rect_h;
 };
 
+
+
+struct SensorISP {
+    int isp_x;
+    int isp_y;
+    unsigned int isp_h;
+    unsigned int isp_w;
+    unsigned int isp_frame_rate;
+    ISP_BAYER_FORMAT_E isp_bayer;
+
+};
+struct SensorVIChn {
+    int cap_rect_x;
+    int cap_rect_y;
+    unsigned int cap_rect_width;
+    unsigned int cap_rect_height;
+    unsigned int dest_size_width;
+    unsigned int dest_size_height;
+    VI_CAPSEL_E cap_sel;
+    PIXEL_FORMAT_E pix_format;
+    COMPRESS_MODE_E compress_mode;
+    int src_frame_rate;
+    int frame_rate;
+};
+
 struct SensorConfig {
     // [sensor]
     char sensor_type[128];
@@ -103,28 +130,34 @@ struct SensorConfig {
     struct SensorLVDS lvds;
 
     // [isp_image]
-    int isp_x;
-    int isp_y;
-    unsigned int isp_h;
-    unsigned int isp_w;
-    unsigned int isp_frame_rate;
-    ISP_BAYER_FORMAT_E isp_bayer;
+    struct SensorISP isp;
 
     // [vi_dev]
     struct SensorVIDEV videv;
 
     // [vi_chn]
-    int cap_rect_x;
-    int cap_rect_y;
-    int cap_rect_width;
-    int cap_rect_height;
-    int dest_size_width;
-    int dest_size_height;
-    VI_CAPSEL_E cap_sel;
-    PIXEL_FORMAT_E pix_format;
-    COMPRESS_MODE_E compress_mode;
-    int src_frame_rate;
-    int frame_rate;
+    struct SensorVIChn vichn;
 };
 
-int parse_sensor_config(const char *path, struct SensorConfig *config);
+#define MAX_SECTIONS 16
+struct IniConfig {
+    char path[256];
+    char *str;
+    struct Section {
+        char name[64];
+        int pos;
+    } sections[MAX_SECTIONS];
+};
+
+
+enum ConfigError {
+    CONFIG_OK = 0,
+    CONFIG_SECTION_NOT_FOUND,
+    CONFIG_PARAM_NOT_FOUND,
+    CONFIG_PARAM_ISNT_NUMBER,
+    CONFIG_PARAM_ISNT_IN_RANGE,
+    CONFIG_ENUM_INCORRECT_STRING,
+    CONFIG_REGEX_ERROR,
+};
+
+enum ConfigError parse_sensor_config(const char *path, struct SensorConfig *config);
