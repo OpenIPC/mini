@@ -8,6 +8,7 @@
 !/minihttp/CMakeLists.txt
 !/minihttp/src/**/*.h
 !/minihttp/src/**/*.c
+!/minihttp/config.ini
 
 !.dockerignore
 !.gitignore
