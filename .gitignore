@@ -6,8 +6,8 @@
 
 !/minihttp/Makefile
 !/minihttp/CMakeLists.txt
-!/minihttp/src/*.h
-!/minihttp/src/*.c
+!/minihttp/src/**/*.h
+!/minihttp/src/**/*.c
 
 !.dockerignore
 !.gitignore

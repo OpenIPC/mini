@@ -23,5 +23,5 @@ struct SDKState {
     VENC_CHN h264_chn;
 };
 
-int start_sdk(const char *config_path, struct SDKState *state);
+int start_sdk(struct SDKState *state);
 int stop_sdk(struct SDKState *state);

@@ -27,6 +27,8 @@
 #include "rtsp/rtputils.h"
 #include "rtsp/ringfifo.h"
 
+#include "app_config.h"
+
 int dump_jpg = -1;
 
 HI_VOID* Test_ISP_Run(HI_VOID *param) {
@@ -38,13 +40,8 @@ HI_VOID* Test_ISP_Run(HI_VOID *param) {
 }
 
 HI_S32 VENC_SaveH264(VENC_STREAM_S *pstStream) {
-    HI_S32 i;
-    for (i = 0; i < pstStream->u32PackCount; i++) {
-        // write(write_pump_h264_fd, pstStream->pstPack[i].pu8Addr + pstStream->pstPack[i].u32Offset, pstStream->pstPack[i].u32Len - pstStream->pstPack[i].u32Offset);
-//        fwrite(pstStream->pstPack[i].pu8Addr+pstStream->pstPack[i].u32Offset, pstStream->pstPack[i].u32Len-pstStream->pstPack[i].u32Offset, 1, fpH264File);
-//        fflush(fpH264File);
-    }
-    HisiPutH264DataToBuffer(pstStream);
+    // send_h264_to_client(pstStream);
+    if (app_config.rtsp_enable) HisiPutH264DataToBuffer(pstStream);
     return HI_SUCCESS;
 }
 
@@ -81,8 +78,10 @@ HI_S32 VENC_SaveMJpeg(VENC_STREAM_S *pstStream) {
         memcpy(mjpeg_buf + buf_size, pstData->pu8Addr+pstData->u32Offset, pstData->u32Len-pstData->u32Offset);
         buf_size += pstData->u32Len-pstData->u32Offset;
     }
-    send_jpeg(mjpeg_buf, buf_size);
-    send_mjpeg(mjpeg_buf, buf_size);
+    if (app_config.mjpg_enable) {
+        send_jpeg(mjpeg_buf, buf_size);
+        send_mjpeg(mjpeg_buf, buf_size);
+    }
     return HI_SUCCESS;
 }
 HI_S32 VENC_SaveStream(PAYLOAD_TYPE_E enType, VENC_STREAM_S *pstStream) {
@@ -180,13 +179,14 @@ int SYS_CalcPicVbBlkSize(unsigned int width, unsigned int height, PIXEL_FORMAT_E
 pthread_t gs_VencPid = 0;
 pthread_t gs_IspPid = 0;
 
-int start_sdk(const char *config_path, struct SDKState *state) {
+int start_sdk(struct SDKState *state) {
+    printf("App build with headers MPP version: %s\n", MPP_VERSION);
     MPP_VERSION_S version;
     HI_MPI_SYS_GetVersion(&version);
-    printf("HISDK version: %s\n", version.aVersion);
+    printf("Current MPP version:     %s\n", version.aVersion);
 
     struct SensorConfig sensor_config;
-    if (parse_sensor_config(config_path, &sensor_config) != CONFIG_OK) {
+    if (parse_sensor_config(app_config.sensor_config, &sensor_config) != CONFIG_OK) {
         printf("Can't load config\n");
         return EXIT_FAILURE;
     }
@@ -201,13 +201,13 @@ int start_sdk(const char *config_path, struct SDKState *state) {
 
     VB_CONF_S vb_conf;
     memset(&vb_conf, 0, sizeof(VB_CONF_S));
-    vb_conf.u32MaxPoolCnt = 128;
+    vb_conf.u32MaxPoolCnt = app_config.max_pool_cnt;
 
-    int u32AlignWidth = 64;
+    int u32AlignWidth = app_config.align_width;
 
     int u32BlkSize = SYS_CalcPicVbBlkSize(width, height, sensor_config.vichn.pix_format, u32AlignWidth);
     vb_conf.astCommPool[0].u32BlkSize = u32BlkSize;
-    vb_conf.astCommPool[0].u32BlkCnt = 10; // HI3516C = 10;  HI3516E = 4;
+    vb_conf.astCommPool[0].u32BlkCnt = app_config.blk_cnt; // HI3516C = 10;  HI3516E = 4;
 
     HI_S32 s32Ret = HI_MPI_VB_SetConf(&vb_conf);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VB_SetConf failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
@@ -287,7 +287,7 @@ int start_sdk(const char *config_path, struct SDKState *state) {
         pthread_attr_init(&thread_attr);
         size_t stacksize;
         pthread_attr_getstacksize(&thread_attr,&stacksize);
-        size_t new_stacksize = 16*1024;
+        size_t new_stacksize = app_config.isp_thread_stack_size;
         if (pthread_attr_setstacksize(&thread_attr, new_stacksize)) { printf("Error:  Can't set stack size %ld\n", new_stacksize); }
         if (0 != pthread_create(&gs_IspPid, &thread_attr, (void* (*)(void*))Test_ISP_Run, NULL)) { printf("%s: create isp running thread failed!\n", __FUNCTION__); return EXIT_FAILURE; }
         if (pthread_attr_setstacksize(&thread_attr, stacksize)) { printf("Error:  Can't set stack size %ld\n", stacksize); }
@@ -572,7 +572,7 @@ int start_sdk(const char *config_path, struct SDKState *state) {
         pthread_attr_init(&thread_attr);
         size_t stacksize;
         pthread_attr_getstacksize(&thread_attr,&stacksize);
-        size_t new_stacksize = 16*1024;
+        size_t new_stacksize = app_config.venc_stream_thread_stack_size;
         if (pthread_attr_setstacksize(&thread_attr, new_stacksize)) { printf("Error:  Can't set stack size %ld\n", new_stacksize); }
         if (0 != pthread_create(&gs_VencPid, &thread_attr, VENC_GetVencStreamProc, NULL)) { printf("%s: create VENC_GetVencStreamProc running thread failed!\n", __FUNCTION__); return EXIT_FAILURE; }
         if (pthread_attr_setstacksize(&thread_attr, stacksize)) { printf("Error:  Can't set stack size %ld\n", stacksize); }
@@ -693,8 +693,6 @@ int stop_sdk(struct SDKState *state) {
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VB_Exit failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
 
     UnloadSensorLibrary();
-
-    printf("RTSP server quit!\n");
 
     printf("Stop sdk Ok!\n");
     return EXIT_SUCCESS;

@@ -6,6 +6,7 @@
 #include <string.h>
 #include "ringfifo.h"
 #include "rtputils.h"
+#include "rtspservice.h"
 
 #define NMAX 32
 

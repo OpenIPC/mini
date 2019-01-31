@@ -10,6 +10,8 @@ extern "C" {
 }
 #endif
 
+#include "config.h"
+
 extern int (*sensor_register_callback_fn)(void);
 extern int (*sensor_unregister_callback_fn)(void);
 extern void *libsns_so;
@@ -20,8 +22,6 @@ void UnloadSensorLibrary();
 
 int sensor_register_callback(void);
 int sensor_unregister_callback(void);
-
-
 
 struct SensorMIPI {
     raw_data_type_e data_type;
@@ -137,27 +137,6 @@ struct SensorConfig {
 
     // [vi_chn]
     struct SensorVIChn vichn;
-};
-
-#define MAX_SECTIONS 16
-struct IniConfig {
-    char path[256];
-    char *str;
-    struct Section {
-        char name[64];
-        int pos;
-    } sections[MAX_SECTIONS];
-};
-
-
-enum ConfigError {
-    CONFIG_OK = 0,
-    CONFIG_SECTION_NOT_FOUND,
-    CONFIG_PARAM_NOT_FOUND,
-    CONFIG_PARAM_ISNT_NUMBER,
-    CONFIG_PARAM_ISNT_IN_RANGE,
-    CONFIG_ENUM_INCORRECT_STRING,
-    CONFIG_REGEX_ERROR,
 };
 
 enum ConfigError parse_sensor_config(const char *path, struct SensorConfig *config);

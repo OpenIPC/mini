@@ -9,23 +9,32 @@
 #include <errno.h>
 #include <regex.h>
 
+#include "mp4/nal.h"
+#include "mp4/mp4.h"
+#include <hi_comm_venc.h>
+
 #include "tools.h"
+
+#include "app_config.h"
 
 int keepRunning = 1; // keep running infinite loop while true
 
 enum StreamType {
     STREAM_H264,
     STREAM_JPEG,
-    STREAM_MJPEG
+    STREAM_MJPEG,
+    STREAM_MP4
 };
 
 struct Client {
     int socket_fd;
     enum StreamType type;
+
+    struct Mp4State mp4_state;
 };
 
 // shared http video clients list
-#define MAX_CLIENTS 10
+#define MAX_CLIENTS 50
 struct Client client_fds[MAX_CLIENTS];
 pthread_mutex_t client_fds_mutex;
 
@@ -56,39 +65,67 @@ int send_to_client(int i, char* buf, ssize_t size) {;
     return 0;
 }
 
-//void *http_thread_h264(void *vargp) {
-//    int read_fd = *((int *) vargp);
-//    const int READ_BUF_SIZE = 256*1024;
-//    char buf[READ_BUF_SIZE + 2]; ssize_t size;
-//    char len_buf[50]; ssize_t len_size;
-//    while (keepRunning) {
-//        size = read(read_fd, buf, READ_BUF_SIZE);
-//        len_size = sprintf(len_buf, "%zX\r\n", size);
-//        buf[size++] = '\r'; buf[size++] = '\n';
-//
-//        pthread_mutex_lock(&client_fds_mutex);
-//        for (uint32_t i = 0; i < MAX_CLIENTS; ++i) {
-//            if (client_fds[i].socket_fd < 0) continue;
-//            if (client_fds[i].type != STREAM_H264) continue;
-//            if (send_to_client(i, len_buf, len_size) < 0) continue; // send <SIZE>\r\n
-//            if (send_to_client(i, buf, size) < 0) continue; // send <DATA>\r\n
-//        }
-//        pthread_mutex_unlock(&client_fds_mutex);
-//    }
-//
-//    pthread_mutex_lock(&client_fds_mutex);
-//    char end[] = "0\r\n\r\n";
-//    for (uint32_t i = 0; i < MAX_CLIENTS; ++i) {
-//        if (client_fds[i].socket_fd < 0) continue;
-//        if (client_fds[i].type != STREAM_H264) continue;
-//        // send 0\r\n\r\n
-//        if (send_to_client(i, end, sizeof(end)) < 0) continue;
-//        free_client(i);
-//    }
-//    pthread_mutex_unlock(&client_fds_mutex);
-//    printf("Shutdown http thread\n");
-//    return NULL;
-//}
+void send_h264_to_client(const void *p) {
+    const VENC_STREAM_S *stream = (const VENC_STREAM_S *)p;
+
+    for (uint32_t i = 0; i < stream->u32PackCount; ++i) {
+        VENC_PACK_S *pack = &stream->pstPack[i];
+        uint32_t pack_len = pack->u32Len - pack->u32Offset;
+        uint8_t *pack_data = pack->pu8Addr + pack->u32Offset;
+
+        ssize_t nal_start = 3;
+        if (!nal_chk3(pack_data, 0)) { ++nal_start; if(!nal_chk4(pack_data, 0)) continue; }
+        pack_data += nal_start;
+
+        struct NAL nal; nal_parse_header(&nal, pack_data[0]);
+        switch (nal.unit_type) {
+            case NalUnitType_SPS: { set_sps(pack_data, pack_len); break; }
+            case NalUnitType_PPS: { set_pps(pack_data, pack_len); break; }
+            case NalUnitType_CodedSliceIdr: { set_slice(pack_data, pack_len); break; }
+            case NalUnitType_CodedSliceNonIdr: { set_slice(pack_data, pack_len); break; }
+            default: break;
+        }
+
+        static enum BufError err;
+        static char len_buf[50];
+        pthread_mutex_lock(&client_fds_mutex);
+        for (uint32_t i = 0; i < MAX_CLIENTS; ++i) {
+            if (client_fds[i].socket_fd < 0) continue;
+            if (client_fds[i].type != STREAM_MP4) continue;
+
+            if (!client_fds[i].mp4_state.header_sent) {
+                struct BitBuf header_buf;
+                err = get_header(&header_buf); chk_err_continue
+                ssize_t len_size = sprintf(len_buf, "%zX\r\n", header_buf.offset);
+                if (send_to_client(i, len_buf, len_size) < 0) continue; // send <SIZE>\r\n
+
+                client_fds[i].mp4_state.sequence_number = 0;
+                client_fds[i].mp4_state.base_data_offset = 0;
+                client_fds[i].mp4_state.base_media_decode_time = 0;
+                client_fds[i].mp4_state.header_sent = true;
+            };
+
+            err = set_mp4_state(&client_fds[i].mp4_state); chk_err_continue
+            {
+                struct BitBuf moof_buf;
+                err = get_moof(&moof_buf); chk_err_continue
+                ssize_t len_size = sprintf(len_buf, "%zX\r\n", (ssize_t)moof_buf.offset);
+                if (send_to_client(i, len_buf, len_size) < 0) continue; // send <SIZE>\r\n
+                if (send_to_client(i, moof_buf.buf, moof_buf.offset) < 0) continue; // send <DATA>
+                if (send_to_client(i, "\r\n", 2) < 0) continue; // send \r\n
+            }
+            {
+                struct BitBuf mdat_buf;
+                err = get_mdat(&mdat_buf); chk_err_continue
+                ssize_t len_size = sprintf(len_buf, "%zX\r\n", (ssize_t)mdat_buf.offset);
+                if (send_to_client(i, len_buf, len_size) < 0) continue; // send <SIZE>\r\n
+                if (send_to_client(i, mdat_buf.buf, mdat_buf.offset) < 0) continue; // send <DATA>
+                if (send_to_client(i, "\r\n", 2) < 0) continue; // send \r\n
+            }
+        }
+        pthread_mutex_unlock(&client_fds_mutex);
+    }
+}
 
 void send_mjpeg(char *buf, ssize_t size) {
     static char prefix_buf[128];
@@ -168,6 +205,25 @@ int send_mjpeg_html(const int client_fd) {
     return 1;
 }
 
+int send_video_html(const int client_fd) {
+    char html[] = "<html>\n"
+                  "    <head>\n"
+                  "        <title>MP4 Streamer</title>\n"
+                  "    </head>\n"
+                  "    <body>\n"
+                  "        <center>\n"
+                  "            <video src=\"video.mp4\" autoplay controls />\n"
+                  "        </center>\n"
+                  "    </body>\n"
+                  "</html>";
+    char buf[1024];
+    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %zX\r\nConnection: close\r\n\r\n%s", strlen(html), html);
+    buf[buf_len++] = 0;
+    send_to_fd(client_fd, buf, buf_len);
+    close_socket_fd(client_fd);
+    return 1;
+}
+
 int send_image_html(const int client_fd) {
     char html[] = "<html>\n"
                   "    <head>\n"
@@ -191,6 +247,7 @@ int send_image_html(const int client_fd) {
 char request_headers[MAX_HEADERS];
 char request_path[64];
 char header[256];
+
 void *server_thread(void *vargp) {
     int server_fd = *((int *) vargp);
     int enable = 1;
@@ -201,7 +258,7 @@ void *server_thread(void *vargp) {
     // setsockopt(server_fd, SOL_SOCKET, SO_NOSIGPIPE, (void *)&set, sizeof(int));
     struct sockaddr_in server;
     server.sin_family = AF_INET;
-    server.sin_port = htons(8080);
+    server.sin_port = htons(app_config.web_port);
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     int res = bind(server_fd, (struct sockaddr*) &server, sizeof(server));
     if (res != 0) {
@@ -233,12 +290,14 @@ void *server_thread(void *vargp) {
         if (strcmp(request_path, "./") == 0) strcpy(request_path, "./mjpeg.html");
 
         // send JPEG html page
-        if (strcmp(request_path, "./image.html") == 0) { send_image_html(client_fd); continue; }
+        if (strcmp(request_path, "./image.html") == 0 && app_config.mjpg_enable) { send_image_html(client_fd); continue; }
         // send MJPEG html page
-        if (strcmp(request_path, "./mjpeg.html") == 0) { send_mjpeg_html(client_fd); continue; }
+        if (strcmp(request_path, "./mjpeg.html") == 0 && app_config.mjpg_enable) { send_mjpeg_html(client_fd); continue; }
+        // send MP4 html page
+        if (strcmp(request_path, "./video.html") == 0 && app_config.mp4_enable) { send_video_html(client_fd); continue; }
 
         // if h264 stream is requested add client_fd socket to client_fds array and send h264 stream with http_thread
-        if (strcmp(request_path, "./h264") == 0) {
+        if (strcmp(request_path, "./h264") == 0 && app_config.mp4_enable) {
             char *mime = "text/plain"; // application/octet-stream
             int header_len = sprintf(header, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n", mime);
             send_to_fd(client_fd, header, header_len);
@@ -249,8 +308,18 @@ void *server_thread(void *vargp) {
             continue;
         }
 
+        if (strcmp(request_path, "./vidoe.mp4") == 0 && app_config.mp4_enable) {
+            int header_len = sprintf(header, "HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n");
+            send_to_fd(client_fd, header, header_len);
+            pthread_mutex_lock(&client_fds_mutex);
+            for (uint32_t i = 0; i < MAX_CLIENTS; ++i)
+                if (client_fds[i].socket_fd < 0) { client_fds[i].socket_fd = client_fd; client_fds[i].type = STREAM_MP4; client_fds[i].mp4_state.header_sent = false; break; }
+            pthread_mutex_unlock(&client_fds_mutex);
+            continue;
+        }
+
         // if mjpeg stream is requested add client_fd socket to client_fds array and send mjpeg stream with http_thread
-        if (strcmp(request_path, "./mjpeg") == 0) {
+        if (strcmp(request_path, "./mjpeg") == 0 && app_config.mjpg_enable) {
             int header_len = sprintf(header, "HTTP/1.0 200 OK\r\nCache-Control: no-cache\r\nPragma: no-cache\r\nConnection: close\r\nContent-Type: multipart/x-mixed-replace; boundary=boundarydonotcross\r\n\r\n");
             send_to_fd(client_fd, header, header_len);
             pthread_mutex_lock(&client_fds_mutex);
@@ -260,7 +329,7 @@ void *server_thread(void *vargp) {
             continue;
         }
 
-        if (strcmp(request_path, "./image.jpg") == 0) {
+        if (strcmp(request_path, "./image.jpg") == 0 && app_config.mjpg_enable) {
             pthread_mutex_lock(&client_fds_mutex);
             for (uint32_t i = 0; i < MAX_CLIENTS; ++i)
                 if (client_fds[i].socket_fd < 0) { client_fds[i].socket_fd = client_fd; client_fds[i].type = STREAM_JPEG; break; }
@@ -308,7 +377,7 @@ int start_server() {
         pthread_attr_init(&thread_attr);
         size_t stacksize;
         pthread_attr_getstacksize(&thread_attr,&stacksize);
-        size_t new_stacksize = 16*1024;
+        size_t new_stacksize = app_config.web_server_thread_stack_size;
         if (pthread_attr_setstacksize(&thread_attr, new_stacksize)) { printf("Error:  Can't set stack size %ld\n", new_stacksize); }
         pthread_create(&server_thread_id, &thread_attr, server_thread, (void *) &server_fd);
         if (pthread_attr_setstacksize(&thread_attr, stacksize)) { printf("Error:  Can't set stack size %ld\n", stacksize); }
