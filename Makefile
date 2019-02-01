@@ -5,7 +5,7 @@ PKG_VERSION:=0.1
 PKG_RELEASE:=1
 PKG_MAINTAINER:=Chertov Maxim <chertovmv@gmail.com>
 
-PKG_LICENSE:=GPL-2.0
+PKG_LICENSE:=MIT
 PKG_LICENSE_FILES:=LICENSE
 
 include $(INCLUDE_DIR)/package.mk
@@ -15,7 +15,6 @@ define Package/$(PKG_NAME)
 	SECTION:=multimedia
 	CATEGORY:=Multimedia
 	TITLE:=Some samples for Hisilicon devices
-	SUBMENU:=Hisilicon OSDRV-2 for HI35_16C_18E_V200 with kernel 3.4.35
 	MAINTAINER:=chertovmv@gmail.com
 	DEPENDS:=+libpthread
 endef
