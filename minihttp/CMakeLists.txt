@@ -26,22 +26,12 @@ add_executable(minihttp
     src/mp4/mp4.h
     src/mp4/mp4.c
 
-    src/app_config.h
-    src/app_config.c
-    src/config.h
-    src/config.c
-    src/hidemo.h
-    src/hidemo.c
-    src/hierrors.h
-    src/hierrors.c
-    src/tools.h
-    src/tools.c
-    src/stack.c
-    src/sensors.h
-    src/sensors.c
-    src/server.h
-    src/server.c
-    src/main.c
+    src/config/app_config.h
+    src/config/app_config.c
+    src/config/config.h
+    src/config/config.c
+    src/config/sensor_config.h
+    src/config/sensor_config.c
 
     src/rtsp/ringfifo.h
     src/rtsp/ringfifo.c
@@ -51,6 +41,19 @@ add_executable(minihttp
     src/rtsp/rtspservice.c
     src/rtsp/rtsputils.h
     src/rtsp/rtsputils.c
+
+    src/hidemo.h
+    src/hidemo.c
+    src/hierrors.h
+    src/hierrors.c
+    src/tools.h
+    src/tools.c
+    src/stack.c
+    src/server.h
+    src/server.c
+    src/sensor.h
+    src/sensor.c
+    src/main.c
 )
 target_link_libraries( minihttp pthread ${HILIBS} )
 install(TARGETS minihttp RUNTIME DESTINATION /usr/bin/)
@@ -85,9 +88,11 @@ install(TARGETS dump RUNTIME DESTINATION /usr/bin/)
 
 if(APPLE)
     add_executable(test_config
-            tools/test_config.c
+        tools/test_config.c
         src/tools.c
-        src/sensors.c
+        src/config/config.c
+        src/config/app_config.c
+        src/config/sensor_config.c
     )
     target_link_libraries(test_config pthread)
     include(tests/CMakeLists.txt)

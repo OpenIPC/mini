@@ -12,7 +12,6 @@ struct IniConfig {
     } sections[MAX_SECTIONS];
 };
 
-
 enum ConfigError {
     CONFIG_OK = 0,
     CONFIG_SECTION_NOT_FOUND,

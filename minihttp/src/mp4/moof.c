@@ -1,9 +1,9 @@
 #include "moof.h"
 #include <string.h>
 
-uint32_t pos_sequence_number;
-uint32_t pos_base_data_offset;
-uint32_t pos_base_media_decode_time;
+uint32_t pos_sequence_number = 0;
+uint32_t pos_base_data_offset = 0;
+uint32_t pos_base_media_decode_time = 0;
 
 struct DataOffsetPos {
     bool data_offset_present;
@@ -34,6 +34,7 @@ enum BufError write_trun(struct BitBuf *ptr,
 enum BufError write_mdat(struct BitBuf *ptr, const char* data, const uint32_t len) {
     enum BufError err;
     uint32_t start_atom = ptr->offset; err = put_u32_be(ptr, 0); chk_err; err = put_str4(ptr, "mdat"); chk_err
+    err = put_u32_be(ptr, len); chk_err   // todo
     err = put(ptr, data, len); chk_err
     err = put_u32_be_to_offset(ptr, start_atom, ptr->offset - start_atom); chk_err
     return BUF_OK;

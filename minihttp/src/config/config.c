@@ -8,7 +8,7 @@
 
 #include <hi_comm_vi.h>
 
-#include "tools.h"
+#include "../tools.h"
 
 enum ConfigError find_sections(struct IniConfig *ini) {
     for (unsigned int i = 0; i < MAX_SECTIONS; ++i) ini->sections[i].pos = -1;

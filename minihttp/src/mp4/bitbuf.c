@@ -11,7 +11,7 @@ char* buf_error_to_str(const enum BufError err) {
         case BUF_ENDOFBUF_ERROR: return "BUF_ENDOFBUF_ERROR";
         case BUF_MALLOC_ERROR: return "BUF_MALLOC_ERROR";
         case BUF_INCORRECT: return "BUF_INCORRECT";
-        default: return "Unknown";
+        default: { static char str[32]; sprintf(str, "Unknown(%d)\0", err); return str; }
     }
 }
 
@@ -126,7 +126,7 @@ enum BufError put_u64_be_to_offset(struct BitBuf *ptr, const uint32_t offset, co
     ptr->buf[offset + 5] = (val >> 16) & 0xff;
     ptr->buf[offset + 6] = (val >>  8) & 0xff;
     ptr->buf[offset + 7] = (val >>  0) & 0xff;
-    return pos;
+    return BUF_OK;
 }
 enum BufError put_u64_be(struct BitBuf *ptr, const uint64_t val) {
     chk_ptr

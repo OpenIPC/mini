@@ -8,7 +8,7 @@
 #include "hidemo.h"
 #include "server.h"
 
-#include "app_config.h"
+#include "config/app_config.h"
 
 #include "rtsp/rtspservice.h"
 #include "rtsp/rtputils.h"

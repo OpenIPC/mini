@@ -19,7 +19,8 @@
 #include <mpi_awb.h>
 #include <mpi_af.h>
 
-#include "sensors.h"
+#include "config/sensor_config.h"
+#include "sensor.h"
 #include "server.h"
 #include "hierrors.h"
 
@@ -27,7 +28,7 @@
 #include "rtsp/rtputils.h"
 #include "rtsp/ringfifo.h"
 
-#include "app_config.h"
+#include "config/app_config.h"
 
 int dump_jpg = -1;
 
@@ -40,7 +41,7 @@ HI_VOID* Test_ISP_Run(HI_VOID *param) {
 }
 
 HI_S32 VENC_SaveH264(VENC_STREAM_S *pstStream) {
-    // send_h264_to_client(pstStream);
+    if (app_config.mp4_enable) send_h264_to_client(pstStream);
     if (app_config.rtsp_enable) HisiPutH264DataToBuffer(pstStream);
     return HI_SUCCESS;
 }
@@ -57,7 +58,7 @@ HI_S32 VENC_SaveJpeg(VENC_STREAM_S *pstStream) {
         }
         fclose(file);
         printf("jpeg dump!\n");
-        keepRunning = 0;
+        keepRunning = false;
     }
     count++;
     return HI_SUCCESS;

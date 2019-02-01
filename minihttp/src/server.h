@@ -1,6 +1,7 @@
 #pragma once
+#include <stdbool.h>
 
-extern int keepRunning;
+extern bool keepRunning;
 
 int start_server();
 int stop_server();

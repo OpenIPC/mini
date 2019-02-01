@@ -15,9 +15,9 @@
 
 #include "tools.h"
 
-#include "app_config.h"
+#include "config/app_config.h"
 
-int keepRunning = 1; // keep running infinite loop while true
+bool keepRunning = true; // keep running infinite loop while true
 
 enum StreamType {
     STREAM_H264,
@@ -83,8 +83,10 @@ void send_h264_to_client(const void *p) {
             case NalUnitType_PPS: { set_pps(pack_data, pack_len); break; }
             case NalUnitType_CodedSliceIdr: { set_slice(pack_data, pack_len); break; }
             case NalUnitType_CodedSliceNonIdr: { set_slice(pack_data, pack_len); break; }
-            default: break;
+            default: continue;
         }
+
+        if (nal.unit_type != NalUnitType_CodedSliceIdr && nal.unit_type != NalUnitType_CodedSliceNonIdr) continue;
 
         static enum BufError err;
         static char len_buf[50];
@@ -98,12 +100,16 @@ void send_h264_to_client(const void *p) {
                 err = get_header(&header_buf); chk_err_continue
                 ssize_t len_size = sprintf(len_buf, "%zX\r\n", header_buf.offset);
                 if (send_to_client(i, len_buf, len_size) < 0) continue; // send <SIZE>\r\n
+                if (send_to_client(i, header_buf.buf, header_buf.offset) < 0) continue; // send <DATA>
+                if (send_to_client(i, "\r\n", 2) < 0) continue; // send \r\n
 
-                client_fds[i].mp4_state.sequence_number = 0;
-                client_fds[i].mp4_state.base_data_offset = 0;
+                client_fds[i].mp4_state.sequence_number = 1;
+                client_fds[i].mp4_state.base_data_offset = header_buf.offset;
                 client_fds[i].mp4_state.base_media_decode_time = 0;
                 client_fds[i].mp4_state.header_sent = true;
-            };
+                client_fds[i].mp4_state.nals_count = 0;
+                client_fds[i].mp4_state.default_sample_duration = 1200000 / 24;
+            }
 
             err = set_mp4_state(&client_fds[i].mp4_state); chk_err_continue
             {
@@ -121,6 +127,12 @@ void send_h264_to_client(const void *p) {
                 if (send_to_client(i, len_buf, len_size) < 0) continue; // send <SIZE>\r\n
                 if (send_to_client(i, mdat_buf.buf, mdat_buf.offset) < 0) continue; // send <DATA>
                 if (send_to_client(i, "\r\n", 2) < 0) continue; // send \r\n
+            }
+            client_fds[i].mp4_state.nals_count++;
+            if (client_fds[i].mp4_state.nals_count == 300) {
+                char end[] = "0\r\n\r\n";
+                if (send_to_client(i, end, sizeof(end)) < 0) continue;
+                free_client(i);
             }
         }
         pthread_mutex_unlock(&client_fds_mutex);
@@ -263,7 +275,7 @@ void *server_thread(void *vargp) {
     int res = bind(server_fd, (struct sockaddr*) &server, sizeof(server));
     if (res != 0) {
         printf("Error: %s (%d)\n", strerror(errno), errno);
-        keepRunning = 0;
+        keepRunning = false;
         close_socket_fd(server_fd);
         return NULL;
     }
@@ -283,7 +295,7 @@ void *server_thread(void *vargp) {
             char response[] = "HTTP/1.1 404 Not Found\r\nContent-Length: 11\r\nConnection: close\r\n\r\nGoodBye!!!!";
             send_to_fd(client_fd, response, sizeof(response) - 1); // zero ending string!
             close_socket_fd(client_fd);
-            keepRunning = 0; break;
+            keepRunning = false; break;
         }
 
         // if path is root send ./index.html file
@@ -308,7 +320,7 @@ void *server_thread(void *vargp) {
             continue;
         }
 
-        if (strcmp(request_path, "./vidoe.mp4") == 0 && app_config.mp4_enable) {
+        if (strcmp(request_path, "./video.mp4") == 0 && app_config.mp4_enable) {
             int header_len = sprintf(header, "HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n");
             send_to_fd(client_fd, header, header_len);
             pthread_mutex_lock(&client_fds_mutex);
@@ -350,7 +362,7 @@ void *server_thread(void *vargp) {
     return NULL;
 }
 
-void sig_handler(int signo) { printf("Graceful shutdown...\n"); keepRunning = 0; }
+void sig_handler(int signo) { printf("Graceful shutdown...\n"); keepRunning = false; }
 void epipe_handler(int signo) { printf("EPIPE\n"); }
 void spipe_handler(int signo) { printf("SIGPIPE\n"); }
 
@@ -388,7 +400,7 @@ int start_server() {
 }
 
 int stop_server() {
-    keepRunning = 0;
+    keepRunning = false;
 
     // stop server_thread while server_fd is closed
     close_socket_fd(server_fd);

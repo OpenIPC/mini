@@ -14,6 +14,8 @@ struct Mp4State {
     uint64_t base_data_offset;
     uint64_t base_media_decode_time;
     uint32_t default_sample_duration;
+
+    uint32_t nals_count;
 };
 
 enum BufError set_slice(const char* nal_data, const uint32_t nal_len);

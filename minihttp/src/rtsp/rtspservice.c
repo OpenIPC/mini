@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -1950,7 +1951,7 @@ extern int keepRunning;
 void IntHandl(int i)
 {
 	stop_schedule = 1;
-	keepRunning = 0;
+	keepRunning = false;
 }
 /**************************************************************************************************
 **
