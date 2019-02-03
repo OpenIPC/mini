@@ -58,34 +58,6 @@ add_executable(minihttp
 target_link_libraries( minihttp pthread ${HILIBS} )
 install(TARGETS minihttp RUNTIME DESTINATION /usr/bin/)
 
-add_executable( dump src/dump.c src/stack.c src/hierrors.c )
-target_link_libraries(dump pthread ${HILIBS})
-install(TARGETS dump RUNTIME DESTINATION /usr/bin/)
-#
-#add_executable( isp_debug tools/isp_debug.c src/stack.c )
-#target_link_libraries(isp_debug pthread ${HILIBS})
-#install(TARGETS isp_debug RUNTIME DESTINATION /usr/bin/)
-#
-#add_executable( vi_bayerdump tools/vi_bayerdump.c src/stack.c )
-#target_link_libraries(vi_bayerdump pthread ${HILIBS})
-#install(TARGETS vi_bayerdump RUNTIME DESTINATION /usr/bin/)
-#
-#add_executable( vi_dump tools/vi_dump.c src/stack.c )
-#target_link_libraries(vi_dump pthread ${HILIBS})
-#install(TARGETS vi_dump RUNTIME DESTINATION /usr/bin/)
-#
-#add_executable( vpss_attr tools/vpss_attr.c src/stack.c )
-#target_link_libraries(vpss_attr pthread ${HILIBS})
-#install(TARGETS vpss_attr RUNTIME DESTINATION /usr/bin/)
-#
-#add_executable( vpss_chn_dump tools/vpss_chn_dump.c src/stack.c )
-#target_link_libraries(vpss_chn_dump pthread ${HILIBS})
-#install(TARGETS vpss_chn_dump RUNTIME DESTINATION /usr/bin/)
-#
-#add_executable( vpss_src_dump tools/vpss_src_dump.c src/stack.c )
-#target_link_libraries(vpss_src_dump pthread ${HILIBS})
-#install(TARGETS vpss_src_dump RUNTIME DESTINATION /usr/bin/)
-
 if(APPLE)
     add_executable(test_config
         tools/test_config.c

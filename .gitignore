@@ -2,7 +2,6 @@
 !*/
 
 !/LICENSE
-!/Makefile
 !/CMakeLists.txt
 !/src/**/*.h
 !/src/**/*.c
