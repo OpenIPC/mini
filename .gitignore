@@ -5,7 +5,7 @@
 !/CMakeLists.txt
 !/src/**/*.h
 !/src/**/*.c
-!/config.ini
+!/minihttp.ini
 
 !.dockerignore
 !.gitignore

@@ -20,8 +20,8 @@ void Usage(char *sPrgNm) {
 }
 
 int main(int argc, char *argv[]) {
-    if (parse_app_config("./config.ini") != CONFIG_OK) {
-        printf("Can't load app config './config.ini'\n");
+    if (parse_app_config("./minihttp.ini") != CONFIG_OK) {
+        printf("Can't load app config './minihttp.ini'\n");
         return EXIT_FAILURE;
     }
 
