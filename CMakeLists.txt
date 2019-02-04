@@ -5,7 +5,14 @@ project(minihttp C)
 set(CMAKE_C_FLAGS "-std=gnu99")
 
 include_directories(
-    ./include   # HISDK headers
+    ./include
+    ${CMAKE_PREFIX_PATH}/usr/include/hisi-osdrv2/
+    ${CMAKE_PREFIX_PATH}/usr/include/hidrv/
+)
+
+link_directories(
+    ${CMAKE_PREFIX_PATH}/usr/lib/hisi-osdrv2/
+    ${CMAKE_PREFIX_PATH}/usr/lib/hidrv/
 )
 
 set(HILIBS
