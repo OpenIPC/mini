@@ -5,7 +5,7 @@ project(minihttp C)
 set(CMAKE_C_FLAGS "-std=gnu99")
 
 include_directories(
-    ./include
+    ./src/
     ${CMAKE_PREFIX_PATH}/usr/include/hisi-osdrv2/
     ${CMAKE_PREFIX_PATH}/usr/include/hidrv/
 )

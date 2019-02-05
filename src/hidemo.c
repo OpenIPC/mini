@@ -41,6 +41,7 @@ HI_VOID* Test_ISP_Run(HI_VOID *param) {
 }
 
 HI_S32 VENC_SaveH264(VENC_STREAM_S *pstStream) {
+    if (app_config.mp4_enable) send_mp4_to_client(pstStream);
     if (app_config.mp4_enable) send_h264_to_client(pstStream);
     if (app_config.rtsp_enable) HisiPutH264DataToBuffer(pstStream);
     return HI_SUCCESS;

@@ -7,6 +7,8 @@
 #include "moof.h"
 #include "nal.h"
 
+extern uint32_t default_sample_size;
+
 struct Mp4State {
     bool header_sent;
 
@@ -18,15 +20,27 @@ struct Mp4State {
     uint32_t nals_count;
 };
 
-enum BufError set_slice(const char* nal_data, const uint32_t nal_len);
-void set_sps(const char* nal_data, const uint32_t nal_len);
-void set_pps(const char* nal_data, const uint32_t nal_len);
+struct Mp4Context {
+    char buf_sps[128];
+    uint16_t buf_sps_len;
+    char buf_pps[128];
+    uint16_t buf_pps_len;
 
-enum BufError get_header(struct BitBuf *ptr);
+    struct BitBuf buf_header;
+    struct BitBuf buf_moof;
+    struct BitBuf buf_mdat;
+};
 
-enum BufError set_mp4_state(struct Mp4State *state);
-enum BufError get_moof(struct BitBuf *ptr);
-enum BufError get_mdat(struct BitBuf *ptr);
+
+enum BufError set_slice(struct Mp4Context *ctx, const char* nal_data, const uint32_t nal_len, const enum NalUnitType unit_type);
+void set_sps(struct Mp4Context *ctx, const char* nal_data, const uint32_t nal_len);
+void set_pps(struct Mp4Context *ctx, const char* nal_data, const uint32_t nal_len);
+
+enum BufError get_header(struct Mp4Context *ctx, struct BitBuf *ptr);
+
+enum BufError set_mp4_state(struct Mp4Context *ctx, struct Mp4State *state);
+enum BufError get_moof(struct Mp4Context *ctx, struct BitBuf *ptr);
+enum BufError get_mdat(struct Mp4Context *ctx, struct BitBuf *ptr);
 
 
 

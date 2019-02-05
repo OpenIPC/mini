@@ -11,7 +11,7 @@ struct SampleInfo {
     uint32_t composition_time;
     uint32_t composition_offset;
     uint32_t size;
-    uint8_t flags;
+    uint32_t flags;
 };
 
 enum BufError write_mdat(struct BitBuf *ptr, const char* data, const uint32_t len);

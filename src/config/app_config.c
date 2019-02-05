@@ -31,8 +31,13 @@ enum ConfigError parse_app_config(const char *path) {
 
     // load config file to string
     ini.str = NULL; {
-        FILE * file = fopen (path, "rb");
-        if (!file) { printf("Can't open file %s\n", path); return -1; }
+        char config_path[50];
+        ssize_t len = sprintf(config_path, "/etc/%s", path);
+        FILE * file = fopen("./minihttp.ini", "rb");
+        if (!file) {
+            file = fopen("/etc/minihttp.ini", "rb");
+            if (!file) { printf("Can't find config minihttp.ini in:\n    ./minihttp.ini\n    /etc/minihttp.ini\n", path); return -1; }
+        }
 
         fseek(file, 0, SEEK_END);
         size_t length = (size_t)ftell(file);

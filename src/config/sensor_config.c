@@ -5,6 +5,7 @@
 #include <string.h>
 #include <limits.h>
 
+struct SensorConfig sensor_config;
 
 enum ConfigError parse_config_lvds(struct IniConfig *ini, const char *section, struct SensorLVDS *lvds) {
     enum ConfigError err;
@@ -280,6 +281,7 @@ enum ConfigError parse_sensor_config(const char *path, struct SensorConfig *conf
     // [vi_chn]
     err = parse_config_vichn(&ini, "vi_chn", &config->vichn); if (err != CONFIG_OK) goto RET_ERR;
 
+    sensor_config = *config;
     free(ini.str); return CONFIG_OK;
     RET_ERR: free(ini.str); return err;
 }

@@ -35,7 +35,9 @@ enum BufError write_mdat(struct BitBuf *ptr, const char* data, const uint32_t le
     enum BufError err;
     uint32_t start_atom = ptr->offset; err = put_u32_be(ptr, 0); chk_err; err = put_str4(ptr, "mdat"); chk_err
     err = put_u32_be(ptr, len); chk_err   // todo
+    // printf(" write_mdat: "); for (int i = 0; i < 32; ++i) printf(" 0x%02hhX", data[i]); printf("\n");
     err = put(ptr, data, len); chk_err
+    // printf("mdat len %d     ptr->offset %d     start_atom: %d \n", len, ptr->offset, start_atom);
     err = put_u32_be_to_offset(ptr, start_atom, ptr->offset - start_atom); chk_err
     return BUF_OK;
 }

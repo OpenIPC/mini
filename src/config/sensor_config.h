@@ -128,4 +128,7 @@ struct SensorConfig {
     struct SensorVIChn vichn;
 };
 
+
+extern struct SensorConfig sensor_config;
+
 enum ConfigError parse_sensor_config(const char *path, struct SensorConfig *config);

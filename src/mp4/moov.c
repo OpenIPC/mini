@@ -254,7 +254,7 @@ enum BufError write_stsd(struct BitBuf *ptr, const struct MoovInfo *moov_info) {
 
 enum BufError write_avc1(struct BitBuf *ptr, const struct MoovInfo *moov_info) {
     enum BufError err;
-    uint32_t start_atom = ptr->offset; err = put_u32_be(ptr, 0); chk_err; err = put_str4(ptr, "stsd"); chk_err
+    uint32_t start_atom = ptr->offset; err = put_u32_be(ptr, 0); chk_err; err = put_str4(ptr, "avc1"); chk_err
 
     err = put_u8(ptr, 0); chk_err; err = put_u8(ptr, 0); chk_err; err = put_u8(ptr, 0); chk_err  // reserved
     err = put_u8(ptr, 0); chk_err; err = put_u8(ptr, 0); chk_err; err = put_u8(ptr, 0); chk_err  // reserved
@@ -271,8 +271,17 @@ enum BufError write_avc1(struct BitBuf *ptr, const struct MoovInfo *moov_info) {
     err = put_u32_be(ptr, 0); chk_err // reserved
     err = put_u16_be(ptr, 1); chk_err // 2 frame_count
     err = put_u8(ptr, 0); chk_err
-    char *compressorname = "";
-    err = put(ptr, compressorname, strlen(compressorname)); chk_err // compressorname
+//    uint8_t *compressorname = { 0, 0, 0, 0, // dailymotion/hls.js
+//                                0, 0, 0, 0,
+//                                0, 0, 0, 0,
+//                                0, 0, 0, 0,
+//                                0, 0, 0, 0,
+//                                0, 0, 0, 0,
+//                                0, 0, 0, 0,
+//                                0, 0, 0 };
+    char compressorname[50] = "OpenIPC project                    ";
+
+    err = put(ptr, compressorname, 31); chk_err // compressorname
     err = put_u16_be(ptr, 24); chk_err // 2 depth
     err = put_u16_be(ptr, 0xffff); chk_err // 2 color_table_id
     err = write_avcC(ptr, moov_info); chk_err

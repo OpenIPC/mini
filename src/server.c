@@ -12,6 +12,7 @@
 #include "mp4/nal.h"
 #include "mp4/mp4.h"
 #include <hi_comm_venc.h>
+#include <config/sensor_config.h>
 
 #include "tools.h"
 
@@ -31,6 +32,8 @@ struct Client {
     enum StreamType type;
 
     struct Mp4State mp4_state;
+
+    uint32_t nal_count;
 };
 
 // shared http video clients list
@@ -65,7 +68,58 @@ int send_to_client(int i, char* buf, ssize_t size) {;
     return 0;
 }
 
+
 void send_h264_to_client(const void *p) {
+    const VENC_STREAM_S *stream = (const VENC_STREAM_S *)p;
+
+    for (uint32_t i = 0; i < stream->u32PackCount; ++i) {
+        VENC_PACK_S *pack = &stream->pstPack[i];
+        uint32_t pack_len = pack->u32Len - pack->u32Offset;
+        uint8_t *pack_data = pack->pu8Addr + pack->u32Offset;
+
+        ssize_t nal_start = 3;
+        if (!nal_chk3(pack_data, 0)) { ++nal_start; if(!nal_chk4(pack_data, 0)) continue; }
+
+        struct NAL nal; nal_parse_header(&nal, (pack_data + nal_start)[0]);
+//        switch (nal.unit_type) {
+//            case NalUnitType_SPS: { set_sps(pack_data, pack_len); break; }
+//            case NalUnitType_PPS: { set_pps(pack_data, pack_len); break; }
+//            case NalUnitType_CodedSliceIdr: { set_slice(pack_data, pack_len); break; }
+//            case NalUnitType_CodedSliceNonIdr: { set_slice(pack_data, pack_len); break; }
+//            default: continue;
+//        }
+        // printf("NAL: %s\n", nal_type_to_str(nal.unit_type));
+
+        pthread_mutex_lock(&client_fds_mutex);
+        for (uint32_t i = 0; i < MAX_CLIENTS; ++i) {
+            if (client_fds[i].socket_fd < 0) continue;
+            if (client_fds[i].type != STREAM_H264) continue;
+
+            if (client_fds[i].nal_count == 0 && nal.unit_type != NalUnitType_SPS) continue;
+
+            printf("NAL: %s send to %d\n", nal_type_to_str(nal.unit_type), i);
+
+            static char len_buf[50];
+            ssize_t len_size = sprintf(len_buf, "%zX\r\n", (ssize_t)pack_len);
+            if (send_to_client(i, len_buf, len_size) < 0) continue; // send <SIZE>\r\n
+            if (send_to_client(i, pack_data, pack_len) < 0) continue; // send <DATA>
+            if (send_to_client(i, "\r\n", 2) < 0) continue; // send \r\n
+
+            client_fds[i].nal_count++;
+            if (client_fds[i].nal_count == 300) {
+                char end[] = "0\r\n\r\n";
+                if (send_to_client(i, end, sizeof(end)) < 0) continue;
+                free_client(i);
+            }
+        }
+        pthread_mutex_unlock(&client_fds_mutex);
+    }
+}
+
+
+struct Mp4Context mp4_context;
+
+void send_mp4_to_client(const void *p) {
     const VENC_STREAM_S *stream = (const VENC_STREAM_S *)p;
 
     for (uint32_t i = 0; i < stream->u32PackCount; ++i) {
@@ -79,10 +133,10 @@ void send_h264_to_client(const void *p) {
 
         struct NAL nal; nal_parse_header(&nal, pack_data[0]);
         switch (nal.unit_type) {
-            case NalUnitType_SPS: { set_sps(pack_data, pack_len); break; }
-            case NalUnitType_PPS: { set_pps(pack_data, pack_len); break; }
-            case NalUnitType_CodedSliceIdr: { set_slice(pack_data, pack_len); break; }
-            case NalUnitType_CodedSliceNonIdr: { set_slice(pack_data, pack_len); break; }
+            case NalUnitType_SPS: { set_sps(&mp4_context, pack_data, pack_len); break; }
+            case NalUnitType_PPS: { set_pps(&mp4_context, pack_data, pack_len); break; }
+            case NalUnitType_CodedSliceIdr: { set_slice(&mp4_context, pack_data, pack_len, nal.unit_type); break; }
+            case NalUnitType_CodedSliceNonIdr: { set_slice(&mp4_context, pack_data, pack_len, nal.unit_type); break; }
             default: continue;
         }
 
@@ -97,7 +151,7 @@ void send_h264_to_client(const void *p) {
 
             if (!client_fds[i].mp4_state.header_sent) {
                 struct BitBuf header_buf;
-                err = get_header(&header_buf); chk_err_continue
+                err = get_header(&mp4_context, &header_buf); chk_err_continue
                 ssize_t len_size = sprintf(len_buf, "%zX\r\n", header_buf.offset);
                 if (send_to_client(i, len_buf, len_size) < 0) continue; // send <SIZE>\r\n
                 if (send_to_client(i, header_buf.buf, header_buf.offset) < 0) continue; // send <DATA>
@@ -108,13 +162,13 @@ void send_h264_to_client(const void *p) {
                 client_fds[i].mp4_state.base_media_decode_time = 0;
                 client_fds[i].mp4_state.header_sent = true;
                 client_fds[i].mp4_state.nals_count = 0;
-                client_fds[i].mp4_state.default_sample_duration = 1200000 / 24;
+                client_fds[i].mp4_state.default_sample_duration = default_sample_size;
             }
 
-            err = set_mp4_state(&client_fds[i].mp4_state); chk_err_continue
+            err = set_mp4_state(&mp4_context, &client_fds[i].mp4_state); chk_err_continue
             {
                 struct BitBuf moof_buf;
-                err = get_moof(&moof_buf); chk_err_continue
+                err = get_moof(&mp4_context, &moof_buf); chk_err_continue
                 ssize_t len_size = sprintf(len_buf, "%zX\r\n", (ssize_t)moof_buf.offset);
                 if (send_to_client(i, len_buf, len_size) < 0) continue; // send <SIZE>\r\n
                 if (send_to_client(i, moof_buf.buf, moof_buf.offset) < 0) continue; // send <DATA>
@@ -122,18 +176,18 @@ void send_h264_to_client(const void *p) {
             }
             {
                 struct BitBuf mdat_buf;
-                err = get_mdat(&mdat_buf); chk_err_continue
+                err = get_mdat(&mp4_context, &mdat_buf); chk_err_continue
                 ssize_t len_size = sprintf(len_buf, "%zX\r\n", (ssize_t)mdat_buf.offset);
                 if (send_to_client(i, len_buf, len_size) < 0) continue; // send <SIZE>\r\n
                 if (send_to_client(i, mdat_buf.buf, mdat_buf.offset) < 0) continue; // send <DATA>
                 if (send_to_client(i, "\r\n", 2) < 0) continue; // send \r\n
             }
-            client_fds[i].mp4_state.nals_count++;
-            if (client_fds[i].mp4_state.nals_count == 300) {
-                char end[] = "0\r\n\r\n";
-                if (send_to_client(i, end, sizeof(end)) < 0) continue;
-                free_client(i);
-            }
+            // client_fds[i].mp4_state.nals_count++;
+            // if (client_fds[i].mp4_state.nals_count == 300) {
+            //     char end[] = "0\r\n\r\n";
+            //     if (send_to_client(i, end, sizeof(end)) < 0) continue;
+            //     free_client(i);
+            // }
         }
         pthread_mutex_unlock(&client_fds_mutex);
     }
@@ -224,7 +278,7 @@ int send_video_html(const int client_fd) {
                   "    </head>\n"
                   "    <body>\n"
                   "        <center>\n"
-                  "            <video src=\"video.mp4\" autoplay controls />\n"
+                  "            <video width=\"700\" src=\"video.mp4\" autoplay controls />\n"
                   "        </center>\n"
                   "    </body>\n"
                   "</html>";
@@ -261,6 +315,8 @@ char request_path[64];
 char header[256];
 
 void *server_thread(void *vargp) {
+    memset(&mp4_context, 0, sizeof(struct Mp4Context));
+
     int server_fd = *((int *) vargp);
     int enable = 1;
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
@@ -309,13 +365,12 @@ void *server_thread(void *vargp) {
         if (strcmp(request_path, "./video.html") == 0 && app_config.mp4_enable) { send_video_html(client_fd); continue; }
 
         // if h264 stream is requested add client_fd socket to client_fds array and send h264 stream with http_thread
-        if (strcmp(request_path, "./h264") == 0 && app_config.mp4_enable) {
-            char *mime = "text/plain"; // application/octet-stream
-            int header_len = sprintf(header, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n", mime);
+        if (strcmp(request_path, "./video.h264") == 0) {
+            int header_len = sprintf(header, "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n");
             send_to_fd(client_fd, header, header_len);
             pthread_mutex_lock(&client_fds_mutex);
             for (uint32_t i = 0; i < MAX_CLIENTS; ++i)
-                if (client_fds[i].socket_fd < 0) { client_fds[i].socket_fd = client_fd; client_fds[i].type = STREAM_H264; break; }
+                if (client_fds[i].socket_fd < 0) { client_fds[i].socket_fd = client_fd; client_fds[i].type = STREAM_H264; client_fds[i].nal_count = 0; break; }
             pthread_mutex_unlock(&client_fds_mutex);
             continue;
         }
