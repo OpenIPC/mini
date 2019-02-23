@@ -60,6 +60,10 @@ add_executable(minihttp
     src/server.c
     src/sensor.h
     src/sensor.c
+    src/chipid.h
+    src/chipid.c
+    src/motion_detect.h
+    src/motion_detect.c
     src/main.c
 )
 target_link_libraries( minihttp pthread ${HILIBS} )

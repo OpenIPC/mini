@@ -20,6 +20,9 @@ enum ConfigError {
     CONFIG_PARAM_ISNT_IN_RANGE,
     CONFIG_ENUM_INCORRECT_STRING,
     CONFIG_REGEX_ERROR,
+    CONFIG_CANT_OPEN_PROC_CMDLINE,
+    CONFIG_SENSOR_ISNOT_SUPPORT,
+    CONFIG_SENSOR_NOT_FOUND,
 };
 
 enum ConfigError find_sections(struct IniConfig *ini);

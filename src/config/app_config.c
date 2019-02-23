@@ -13,10 +13,15 @@ enum ConfigError parse_app_config(const char *path) {
     memset(&app_config, 0, sizeof(struct AppConfig));
 
     app_config.sensor_config[0] = 0;
-    app_config.mjpg_enable = true;
+    app_config.jpeg_enable = false;
+    app_config.mjpg_enable = false;
     app_config.mp4_enable = false;
     app_config.rtsp_enable = false;
+    app_config.osd_enable = false;
+    app_config.motion_detect_enable = false;
+
     app_config.web_port = 8080;
+    app_config.web_enable_static = false;
 
     app_config.isp_thread_stack_size = 16*1024;
     app_config.venc_stream_thread_stack_size = 16*1024;
@@ -57,8 +62,11 @@ enum ConfigError parse_app_config(const char *path) {
     err = parse_param_value(&ini, "system", "sensor_config", app_config.sensor_config); if (err != CONFIG_OK) goto RET_ERR;
     err = parse_bool(&ini, "system", "rtsp_enable", &app_config.rtsp_enable); if (err != CONFIG_OK) goto RET_ERR;
     err = parse_bool(&ini, "system", "mp4_enable", &app_config.mp4_enable); if (err != CONFIG_OK) goto RET_ERR;
+    err = parse_bool(&ini, "system", "jpeg_enable", &app_config.jpeg_enable); if (err != CONFIG_OK) goto RET_ERR;
     err = parse_bool(&ini, "system", "mjpeg_enable", &app_config.mjpg_enable); if (err != CONFIG_OK) goto RET_ERR;
+
     err = parse_int(&ini, "system", "web_port", 1, INT_MAX, &app_config.web_port); if(err != CONFIG_OK) goto RET_ERR;
+    err = parse_bool(&ini, "system", "web_enable_static", &app_config.web_enable_static); if(err != CONFIG_OK) goto RET_ERR;
 
     err = parse_int(&ini, "system", "isp_thread_stack_size", 16*1024, INT_MAX, &app_config.isp_thread_stack_size); if(err != CONFIG_OK) goto RET_ERR;
     err = parse_int(&ini, "system", "venc_stream_thread_stack_size", 16*1024, INT_MAX, &app_config.venc_stream_thread_stack_size); if(err != CONFIG_OK) goto RET_ERR;

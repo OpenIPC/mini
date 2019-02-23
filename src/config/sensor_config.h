@@ -131,4 +131,4 @@ struct SensorConfig {
 
 extern struct SensorConfig sensor_config;
 
-enum ConfigError parse_sensor_config(const char *path, struct SensorConfig *config);
+enum ConfigError parse_sensor_config(char *path, struct SensorConfig *config);

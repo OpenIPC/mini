@@ -5,7 +5,26 @@
 #include <string.h>
 #include <limits.h>
 
+#include "../tools.h"
+
 struct SensorConfig sensor_config;
+
+enum ConfigError read_sensor_from_proc_cmdline(char *sensor_type) {
+    FILE *file = fopen("/proc/cmdline", "r");
+    if (!file) return CONFIG_CANT_OPEN_PROC_CMDLINE;
+    char cmdline[5*1024];
+    fread(cmdline,1, 5*1024, file);
+    fclose(file);
+
+    regex_t regex;
+    if (compile_regex(&regex, "[[:space:]]*sensor=([[:alnum:]_]+)[[:space:]]*") < 0) { printf("compile_regex error\n"); return CONFIG_REGEX_ERROR; };
+    size_t n_matches = 2; // We have 1 capturing group + the whole match group
+    regmatch_t m[n_matches];
+    int match = regexec(&regex, cmdline, n_matches, m, 0);
+    if (match != 0) { regfree(&regex); printf("Can't parse sensor=xxxx from cmdline: \n'%s'\n", cmdline); return CONFIG_REGEX_ERROR; }
+    sprintf(sensor_type, "%.*s", (int)(m[1].rm_eo - m[1].rm_so), cmdline + m[1].rm_so);
+    return CONFIG_OK;
+}
 
 enum ConfigError parse_config_lvds(struct IniConfig *ini, const char *section, struct SensorLVDS *lvds) {
     enum ConfigError err;
@@ -213,12 +232,28 @@ enum ConfigError parse_config_isp(struct IniConfig *ini, const char *section, st
     return CONFIG_OK;
 }
 
-enum ConfigError parse_sensor_config(const char *path, struct SensorConfig *config) {
+enum ConfigError parse_sensor_config(char *path, struct SensorConfig *config) {
     if (config == NULL) return -1;
     memset(config, 0, sizeof(struct SensorConfig));
-
     struct IniConfig ini;
     memset(&ini, 0, sizeof(struct IniConfig));
+    enum ConfigError err;
+
+//    char sensor_type[128];
+//    if (strcmp(path, "from_bootargs") == 0) {
+//        err = read_sensor_from_proc_cmdline(sensor_type);
+//        if (err != CONFIG_OK) { printf("Can't get sensor type from bootargs %s\n"); return err; }
+//        printf("sensor type from bootargs: %s\n", sensor_type);
+//
+//        if (strcmp(sensor_type, "ar0130") == 0) { path = "/etc/sensors/ar0130_720p_line.ini"; }
+//        else if (strcmp(sensor_type, "imx222") == 0) { path = "/etc/sensors/imx222_1080p_line.ini"; }
+//        else if (strcmp(sensor_type, "ov9712") == 0) { path = "/etc/sensors/ov9712_720p_line.ini"; }
+//        else if (strcmp(sensor_type, "sc2135") == 0) { path = "/etc/sensors/sc2135_1080p_line.ini"; }
+//        else {
+//            printf("Sensor type '%s' is not support yet! Please specify full path to sensor config in minihttp.ini", sensor_type);
+//            return CONFIG_SENSOR_ISNOT_SUPPORT;
+//        }
+//    }
 
     // load config file to string
     ini.str = NULL; {
@@ -237,7 +272,6 @@ enum ConfigError parse_sensor_config(const char *path, struct SensorConfig *conf
         ini.str[length] = 0;
     }
 
-    enum ConfigError err;
     find_sections(&ini);
 
     // [sensor]

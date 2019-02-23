@@ -358,7 +358,7 @@ void *server_thread(void *vargp) {
         if (strcmp(request_path, "./") == 0) strcpy(request_path, "./mjpeg.html");
 
         // send JPEG html page
-        if (strcmp(request_path, "./image.html") == 0 && app_config.mjpg_enable) { send_image_html(client_fd); continue; }
+        if (strcmp(request_path, "./image.html") == 0 && app_config.jpeg_enable) { send_image_html(client_fd); continue; }
         // send MJPEG html page
         if (strcmp(request_path, "./mjpeg.html") == 0 && app_config.mjpg_enable) { send_mjpeg_html(client_fd); continue; }
         // send MP4 html page
@@ -396,7 +396,7 @@ void *server_thread(void *vargp) {
             continue;
         }
 
-        if (strcmp(request_path, "./image.jpg") == 0 && app_config.mjpg_enable) {
+        if (strcmp(request_path, "./image.jpg") == 0 && app_config.jpeg_enable) {
             pthread_mutex_lock(&client_fds_mutex);
             for (uint32_t i = 0; i < MAX_CLIENTS; ++i)
                 if (client_fds[i].socket_fd < 0) { client_fds[i].socket_fd = client_fd; client_fds[i].type = STREAM_JPEG; break; }
@@ -405,7 +405,7 @@ void *server_thread(void *vargp) {
         }
 
         // try to send static file
-        if (send_file(client_fd, request_path)) continue;
+        if (app_config.web_enable_static && send_file(client_fd, request_path)) continue;
 
         // 404
         static char response[] = "HTTP/1.1 404 Not Found\r\nContent-Length: 11\r\nConnection: close\r\n\r\nHello, 404!";

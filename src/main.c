@@ -14,18 +14,21 @@
 #include "rtsp/rtputils.h"
 #include "rtsp/ringfifo.h"
 
-void Usage(char *sPrgNm) {
-    printf("Usage : %s <path to sensor config ini>\n", sPrgNm);
-    printf("   ex: %s ./configs/imx222_1080p_line.ini\n", sPrgNm);
-}
+#include "chipid.h"
+
+// void Usage(char *sPrgNm) {
+//     printf("Usage : %s <path to sensor config ini>\n", sPrgNm);
+//     printf("   ex: %s ./configs/imx222_1080p_line.ini\n", sPrgNm);
+// }
 
 int main(int argc, char *argv[]) {
+    chip_id();
+    isp_version();
+
     if (parse_app_config("./minihttp.ini") != CONFIG_OK) {
         printf("Can't load app config './minihttp.ini'\n");
         return EXIT_FAILURE;
     }
-
-    if (argc > 2) { dump_jpg = atoi(argv[2]); }
 
     start_server();
 
