@@ -210,7 +210,7 @@ void send_mjpeg(char *buf, ssize_t size) {
 
 void send_jpeg(char *buf, ssize_t size) {
     static char prefix_buf[128];
-    ssize_t prefix_size = sprintf(prefix_buf, "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: %zX\r\nConnection: close\r\n\r\n", size);
+    ssize_t prefix_size = sprintf(prefix_buf, "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\nConnection: close\r\n\r\n", size);
     buf[size++] = '\r'; buf[size++] = '\n';
 
     pthread_mutex_lock(&client_fds_mutex);
@@ -264,7 +264,7 @@ int send_mjpeg_html(const int client_fd) {
                   "    </body>\n"
                   "</html>";
     char buf[1024];
-    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %zX\r\nConnection: close\r\n\r\n%s", strlen(html), html);
+    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", strlen(html), html);
     buf[buf_len++] = 0;
     send_to_fd(client_fd, buf, buf_len);
     close_socket_fd(client_fd);
@@ -283,7 +283,7 @@ int send_video_html(const int client_fd) {
                   "    </body>\n"
                   "</html>";
     char buf[1024];
-    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %zX\r\nConnection: close\r\n\r\n%s", strlen(html), html);
+    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", strlen(html), html);
     buf[buf_len++] = 0;
     send_to_fd(client_fd, buf, buf_len);
     close_socket_fd(client_fd);
@@ -302,7 +302,7 @@ int send_image_html(const int client_fd) {
                   "    </body>\n"
                   "</html>";
     char buf[1024];
-    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %zX\r\nConnection: close\r\n\r\n%s", strlen(html), html);
+    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", strlen(html), html);
     buf[buf_len++] = 0;
     send_to_fd(client_fd, buf, buf_len);
     close_socket_fd(client_fd);
