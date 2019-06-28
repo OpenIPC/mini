@@ -6,9 +6,27 @@ struct AppConfig {
     char sensor_config[128];
 
     bool rtsp_enable;
+
+    // [video_0]
     bool mp4_enable;
-    bool mjpg_enable;
+    uint32_t mp4_fps;
+    uint32_t mp4_width;
+    uint32_t mp4_height;
+    uint32_t mp4_bitrate;
+
+    // [jpeg]
     bool jpeg_enable;
+    uint32_t jpeg_fps;
+    uint32_t jpeg_width;
+    uint32_t jpeg_height;
+    uint32_t jpeg_bitrate;
+
+    // [mjpeg]
+    bool mjpeg_enable;
+    uint32_t mjpeg_fps;
+    uint32_t mjpeg_width;
+    uint32_t mjpeg_height;
+    uint32_t mjpeg_bitrate;
 
     bool osd_enable;
     bool motion_detect_enable;

@@ -34,9 +34,6 @@ int main(int argc, char *argv[]) {
 
     struct SDKState state;
     memset(&state, 0, sizeof(struct SDKState));
-    state.mjpeg_chn = 0;
-    state.h264_chn = 1;
-    state.jpeg_chn = 2;
 
     int s32MainFd;
     if (app_config.rtsp_enable) {
@@ -52,7 +49,7 @@ int main(int argc, char *argv[]) {
         RTP_port_pool_init(RTP_DEFAULT_PORT);
     }
 
-    if(start_sdk(&state) == EXIT_FAILURE) return EXIT_FAILURE;
+    if(start_sdk(&state) == EXIT_FAILURE) keepRunning = 0; // return EXIT_FAILURE;
     // TODO when return EXIT_FAILURE need to deinitialize sdk correctly
 
     if (app_config.rtsp_enable) {

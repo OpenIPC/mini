@@ -14,11 +14,16 @@ enum ConfigError parse_app_config(const char *path) {
 
     app_config.sensor_config[0] = 0;
     app_config.jpeg_enable = false;
-    app_config.mjpg_enable = false;
     app_config.mp4_enable = false;
     app_config.rtsp_enable = false;
     app_config.osd_enable = false;
     app_config.motion_detect_enable = false;
+
+    app_config.mjpeg_enable = false;
+    app_config.mjpeg_fps = 15;
+    app_config.mjpeg_width = 640;
+    app_config.mjpeg_height = 480;
+    app_config.mjpeg_bitrate = 1024;
 
     app_config.web_port = 8080;
     app_config.web_enable_static = false;
@@ -35,7 +40,8 @@ enum ConfigError parse_app_config(const char *path) {
     memset(&ini, 0, sizeof(struct IniConfig));
 
     // load config file to string
-    ini.str = NULL; {
+    ini.str = NULL;
+    {
         char config_path[50];
         ssize_t len = sprintf(config_path, "/etc/%s", path);
         FILE * file = fopen("./minihttp.ini", "rb");
@@ -60,14 +66,8 @@ enum ConfigError parse_app_config(const char *path) {
     find_sections(&ini);
 
     err = parse_param_value(&ini, "system", "sensor_config", app_config.sensor_config); if (err != CONFIG_OK) goto RET_ERR;
-    err = parse_bool(&ini, "system", "rtsp_enable", &app_config.rtsp_enable); if (err != CONFIG_OK) goto RET_ERR;
-    err = parse_bool(&ini, "system", "mp4_enable", &app_config.mp4_enable); if (err != CONFIG_OK) goto RET_ERR;
-    err = parse_bool(&ini, "system", "jpeg_enable", &app_config.jpeg_enable); if (err != CONFIG_OK) goto RET_ERR;
-    err = parse_bool(&ini, "system", "mjpeg_enable", &app_config.mjpg_enable); if (err != CONFIG_OK) goto RET_ERR;
-
     err = parse_int(&ini, "system", "web_port", 1, INT_MAX, &app_config.web_port); if(err != CONFIG_OK) goto RET_ERR;
     err = parse_bool(&ini, "system", "web_enable_static", &app_config.web_enable_static); if(err != CONFIG_OK) goto RET_ERR;
-
     err = parse_int(&ini, "system", "isp_thread_stack_size", 16*1024, INT_MAX, &app_config.isp_thread_stack_size); if(err != CONFIG_OK) goto RET_ERR;
     err = parse_int(&ini, "system", "venc_stream_thread_stack_size", 16*1024, INT_MAX, &app_config.venc_stream_thread_stack_size); if(err != CONFIG_OK) goto RET_ERR;
     err = parse_int(&ini, "system", "web_server_thread_stack_size", 16*1024, INT_MAX, &app_config.web_server_thread_stack_size); if(err != CONFIG_OK) goto RET_ERR;
@@ -84,6 +84,32 @@ enum ConfigError parse_app_config(const char *path) {
         const int count = sizeof(possible_values) / sizeof(const char *);
         err = parse_enum(&ini, "isp", "blk_cnt", &app_config.blk_cnt,  possible_values, count, 0); if(err != CONFIG_OK) goto RET_ERR;
         err = parse_int(&ini, "isp", "blk_cnt", 4, INT_MAX, &app_config.blk_cnt); if(err != CONFIG_OK) goto RET_ERR;
+    }
+
+    err = parse_bool(&ini, "rtsp", "enable", &app_config.rtsp_enable); if (err != CONFIG_OK) goto RET_ERR;
+
+    err = parse_bool(&ini, "mp4", "enable", &app_config.mp4_enable); if (err != CONFIG_OK) goto RET_ERR;
+    if (app_config.mp4_enable) {
+        err = parse_int(&ini, "mp4", "width", 160, INT_MAX, &app_config.mp4_width); if (err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "mp4", "height", 120, INT_MAX, &app_config.mp4_height); if (err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "mp4", "fps", 1, INT_MAX, &app_config.mp4_fps); if (err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "mp4", "bitrate", 32, INT_MAX, &app_config.mp4_bitrate); if (err != CONFIG_OK) goto RET_ERR;
+    }
+
+    err = parse_bool(&ini, "jpeg", "enable", &app_config.jpeg_enable); if (err != CONFIG_OK) goto RET_ERR;
+    if (app_config.jpeg_enable) {
+        err = parse_int(&ini, "jpeg", "width", 160, INT_MAX, &app_config.jpeg_width); if (err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "jpeg", "height", 120, INT_MAX, &app_config.jpeg_height); if (err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "jpeg", "fps", 1, INT_MAX, &app_config.jpeg_fps); if (err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "jpeg", "bitrate", 32, INT_MAX, &app_config.jpeg_bitrate); if (err != CONFIG_OK) goto RET_ERR;
+    }
+
+    err = parse_bool(&ini, "mjpeg", "enable", &app_config.mjpeg_enable); if (err != CONFIG_OK) goto RET_ERR;
+    if (app_config.mjpeg_enable) {
+        err = parse_int(&ini, "mjpeg", "width", 160, INT_MAX, &app_config.mjpeg_width); if (err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "mjpeg", "height", 120, INT_MAX, &app_config.mjpeg_height); if (err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "mjpeg", "fps", 1, INT_MAX, &app_config.mjpeg_fps); if (err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "mjpeg", "bitrate", 32, INT_MAX, &app_config.mjpeg_bitrate); if (err != CONFIG_OK) goto RET_ERR;
     }
 
     free(ini.str); return CONFIG_OK;

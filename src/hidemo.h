@@ -14,11 +14,7 @@ struct SDKState {
     VI_DEV vi_dev;
     VI_CHN vi_chn;
     VPSS_GRP vpss_grp;
-    VPSS_CHN vpss_chn;
-
-    VENC_CHN jpeg_chn;
-    VENC_CHN mjpeg_chn;
-    VENC_CHN h264_chn;
+    VPSS_CHN next_free_channel;
 
     MD_CHN md_chn;
 };

@@ -69,7 +69,7 @@ int send_to_client(int i, char* buf, ssize_t size) {;
 }
 
 
-void send_h264_to_client(const void *p) {
+void send_h264_to_client(uint8_t chn_index, const void *p) {
     const VENC_STREAM_S *stream = (const VENC_STREAM_S *)p;
 
     for (uint32_t i = 0; i < stream->u32PackCount; ++i) {
@@ -119,7 +119,7 @@ void send_h264_to_client(const void *p) {
 
 struct Mp4Context mp4_context;
 
-void send_mp4_to_client(const void *p) {
+void send_mp4_to_client(uint8_t chn_index, const void *p) {
     const VENC_STREAM_S *stream = (const VENC_STREAM_S *)p;
 
     for (uint32_t i = 0; i < stream->u32PackCount; ++i) {
@@ -139,6 +139,12 @@ void send_mp4_to_client(const void *p) {
             case NalUnitType_CodedSliceNonIdr: { set_slice(&mp4_context, pack_data, pack_len, nal.unit_type); break; }
             default: continue;
         }
+
+//        static uint64_t last_pts = 0;
+//        uint64_t delta = stream->pstPack->u64PTS - last_pts;
+//        // printf("nal %s       pts: %lld       delta: %lld\n", nal_type_to_str(nal.unit_type), stream->pstPack->u64PTS, delta);
+//        printf("%d   nal %s    delta: %lld\n", chn_index, nal_type_to_str(nal.unit_type), delta);
+//        last_pts = stream->pstPack->u64PTS;
 
         if (nal.unit_type != NalUnitType_CodedSliceIdr && nal.unit_type != NalUnitType_CodedSliceNonIdr) continue;
 
@@ -193,9 +199,9 @@ void send_mp4_to_client(const void *p) {
     }
 }
 
-void send_mjpeg(char *buf, ssize_t size) {
+void send_mjpeg(uint8_t chn_index, char *buf, ssize_t size) {
     static char prefix_buf[128];
-    ssize_t prefix_size = sprintf(prefix_buf, "--boundarydonotcross\r\nContent-Type:image/jpeg\r\nContent-Length: %d\r\n\r\n", size);
+    ssize_t prefix_size = sprintf(prefix_buf, "--boundarydonotcross\r\nContent-Type:image/jpeg\r\nContent-Length: %lu\r\n\r\n", size);
     buf[size++] = '\r'; buf[size++] = '\n';
 
     pthread_mutex_lock(&client_fds_mutex);
@@ -208,9 +214,9 @@ void send_mjpeg(char *buf, ssize_t size) {
     pthread_mutex_unlock(&client_fds_mutex);
 }
 
-void send_jpeg(char *buf, ssize_t size) {
+void send_jpeg(uint8_t chn_index, char *buf, ssize_t size) {
     static char prefix_buf[128];
-    ssize_t prefix_size = sprintf(prefix_buf, "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\nConnection: close\r\n\r\n", size);
+    ssize_t prefix_size = sprintf(prefix_buf, "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: %lu\r\nConnection: close\r\n\r\n", size);
     buf[size++] = '\r'; buf[size++] = '\n';
 
     pthread_mutex_lock(&client_fds_mutex);
@@ -264,7 +270,7 @@ int send_mjpeg_html(const int client_fd) {
                   "    </body>\n"
                   "</html>";
     char buf[1024];
-    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", strlen(html), html);
+    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %lu\r\nConnection: close\r\n\r\n%s", strlen(html), html);
     buf[buf_len++] = 0;
     send_to_fd(client_fd, buf, buf_len);
     close_socket_fd(client_fd);
@@ -283,7 +289,7 @@ int send_video_html(const int client_fd) {
                   "    </body>\n"
                   "</html>";
     char buf[1024];
-    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", strlen(html), html);
+    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %lu\r\nConnection: close\r\n\r\n%s", strlen(html), html);
     buf[buf_len++] = 0;
     send_to_fd(client_fd, buf, buf_len);
     close_socket_fd(client_fd);
@@ -302,7 +308,7 @@ int send_image_html(const int client_fd) {
                   "    </body>\n"
                   "</html>";
     char buf[1024];
-    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", strlen(html), html);
+    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %lu\r\nConnection: close\r\n\r\n%s", strlen(html), html);
     buf[buf_len++] = 0;
     send_to_fd(client_fd, buf, buf_len);
     close_socket_fd(client_fd);
@@ -360,7 +366,7 @@ void *server_thread(void *vargp) {
         // send JPEG html page
         if (strcmp(request_path, "./image.html") == 0 && app_config.jpeg_enable) { send_image_html(client_fd); continue; }
         // send MJPEG html page
-        if (strcmp(request_path, "./mjpeg.html") == 0 && app_config.mjpg_enable) { send_mjpeg_html(client_fd); continue; }
+        if (strcmp(request_path, "./mjpeg.html") == 0 && app_config.mjpeg_enable) { send_mjpeg_html(client_fd); continue; }
         // send MP4 html page
         if (strcmp(request_path, "./video.html") == 0 && app_config.mp4_enable) { send_video_html(client_fd); continue; }
 
@@ -386,7 +392,7 @@ void *server_thread(void *vargp) {
         }
 
         // if mjpeg stream is requested add client_fd socket to client_fds array and send mjpeg stream with http_thread
-        if (strcmp(request_path, "./mjpeg") == 0 && app_config.mjpg_enable) {
+        if (strcmp(request_path, "./mjpeg") == 0 && app_config.mjpeg_enable) {
             int header_len = sprintf(header, "HTTP/1.0 200 OK\r\nCache-Control: no-cache\r\nPragma: no-cache\r\nConnection: close\r\nContent-Type: multipart/x-mixed-replace; boundary=boundarydonotcross\r\n\r\n");
             send_to_fd(client_fd, header, header_len);
             pthread_mutex_lock(&client_fds_mutex);
