@@ -28,6 +28,18 @@ struct AppConfig {
     uint32_t mjpeg_height;
     uint32_t mjpeg_bitrate;
 
+    // [http_post_jpeg]
+    bool http_post_enable;
+    char http_post_host[128];
+    char http_post_url[128];
+    char http_post_login[128];
+    char http_post_password[128];
+    uint32_t http_post_width;
+    uint32_t http_post_height;
+    uint32_t http_post_interval;
+
+    uint32_t http_post_chn;
+
     bool osd_enable;
     bool motion_detect_enable;
 

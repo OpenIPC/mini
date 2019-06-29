@@ -31,6 +31,7 @@
 
 #include "config/app_config.h"
 
+#include "http_post.h"
 #include "motion_detect.h"
 
 HI_S32 HI_MPI_SYS_GetChipId(HI_U32 *pu32ChipId);
@@ -51,22 +52,22 @@ HI_S32 VENC_SaveH264(int chn_index, VENC_STREAM_S *pstStream) {
 }
 
 HI_S32 VENC_SaveJpeg(int chn_index, VENC_STREAM_S *pstStream) {
-    if (app_config.jpeg_enable) {
-        static char *jpeg_buf;
-        static ssize_t jpeg_buf_size = 0;
-        ssize_t buf_size = 0;
-        for (HI_U32 i = 0; i < pstStream->u32PackCount; i++) {
-            VENC_PACK_S*  pstData = &pstStream->pstPack[i];
-            ssize_t need_size = buf_size + pstData->u32Len-pstData->u32Offset + 2;
-            if (need_size > jpeg_buf_size) {
-                jpeg_buf = realloc(jpeg_buf, need_size);
-                jpeg_buf_size = need_size;
-            }
-            memcpy(jpeg_buf + buf_size, pstData->pu8Addr+pstData->u32Offset, pstData->u32Len-pstData->u32Offset);
-            buf_size += pstData->u32Len-pstData->u32Offset;
+    static char *jpeg_buf;
+    static ssize_t jpeg_buf_size = 0;
+    ssize_t buf_size = 0;
+    for (HI_U32 i = 0; i < pstStream->u32PackCount; i++) {
+        VENC_PACK_S*  pstData = &pstStream->pstPack[i];
+        ssize_t need_size = buf_size + pstData->u32Len-pstData->u32Offset + 2;
+        if (need_size > jpeg_buf_size) {
+            jpeg_buf = realloc(jpeg_buf, need_size);
+            jpeg_buf_size = need_size;
         }
-        send_jpeg(chn_index, jpeg_buf, buf_size);
+        memcpy(jpeg_buf + buf_size, pstData->pu8Addr+pstData->u32Offset, pstData->u32Len-pstData->u32Offset);
+        buf_size += pstData->u32Len-pstData->u32Offset;
     }
+    if (app_config.jpeg_enable) send_jpeg(chn_index, jpeg_buf, buf_size);
+    if (app_config.http_post_enable) http_post_send_jpeg(chn_index, jpeg_buf, buf_size);
+
     return HI_SUCCESS;
 }
 
@@ -101,7 +102,6 @@ HI_S32 VENC_SaveStream(int chn_index, PAYLOAD_TYPE_E enType, VENC_STREAM_S *pstS
     return s32Ret;
 }
 
-
 bool VencEnabled[VENC_MAX_CHN_NUM] = {0};
 
 HI_VOID* VENC_GetVencStreamProc(HI_VOID *p) {
@@ -123,7 +123,7 @@ HI_VOID* VENC_GetVencStreamProc(HI_VOID *p) {
         if (VencFd[chn_index] < 0) { printf("HI_MPI_VENC_GetFd chn[%d] failed with %#x!\n%s\n", chn_index, VencFd[chn_index], hi_errstr(VencFd[chn_index])); return NULL; }
         if (maxfd <= VencFd[chn_index]) {  maxfd = VencFd[chn_index]; }
 
-        printf("set VencFd chn: %d,  fd: %d\n", chn_index, VencFd[chn_index]);
+        // printf("set VencFd chn: %d,  fd: %d\n", chn_index, VencFd[chn_index]);
     }
 
     VENC_CHN_STAT_S stStat;
@@ -595,6 +595,55 @@ int start_sdk(struct SDKState *state) {
         unsigned int height = app_config.jpeg_height;
 
         VENC_CHN venc_chn = vpss_chn;
+        VENC_ATTR_JPEG_S jpeg_attr;
+        memset(&jpeg_attr, 0, sizeof(VENC_ATTR_JPEG_S));
+        jpeg_attr.u32MaxPicWidth  = width;
+        jpeg_attr.u32MaxPicHeight = height;
+        jpeg_attr.u32PicWidth  = width;
+        jpeg_attr.u32PicHeight = height;
+        jpeg_attr.u32BufSize = (((width+15)>>4)<<4) * (((height+15)>>4)<<4);
+        jpeg_attr.bByFrame = HI_TRUE; /*get stream mode is field mode  or frame mode*/
+        jpeg_attr.bSupportDCF = HI_FALSE;
+
+        VENC_CHN_ATTR_S venc_chn_attr;
+        memset(&venc_chn_attr, 0, sizeof(VENC_CHN_ATTR_S));
+        venc_chn_attr.stVeAttr.enType = PT_JPEG;
+        memcpy(&venc_chn_attr.stVeAttr.stAttrJpeg, &jpeg_attr, sizeof(VENC_ATTR_JPEG_S));
+
+        s32Ret = HI_MPI_VENC_CreateChn(venc_chn, &venc_chn_attr);
+        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_CreateChn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+        {
+            MPP_CHN_S src_chn;
+            memset(&src_chn, 0, sizeof(MPP_CHN_S));
+            src_chn.enModId = HI_ID_VPSS;
+            src_chn.s32DevId = 0;
+            src_chn.s32ChnId = vpss_chn;
+            MPP_CHN_S dest_chn;
+            memset(&dest_chn, 0, sizeof(MPP_CHN_S));
+            dest_chn.enModId = HI_ID_VENC;
+            dest_chn.s32DevId = 0;
+            dest_chn.s32ChnId = venc_chn;
+
+            s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
+            if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return HI_FAILURE; }
+        }
+        s32Ret = HI_MPI_VENC_StartRecvPic(venc_chn);
+        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_StartRecvPic failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+        VencEnabled[venc_chn] = true;
+    }
+
+    if (app_config.http_post_enable) {
+        VPSS_CHN vpss_chn = state->next_free_channel;
+        state->next_free_channel++;
+        s32Ret = create_vpss_chn(state->vpss_grp, vpss_chn, sensor_config.isp.isp_frame_rate, 1);
+        if (HI_SUCCESS != s32Ret) { printf("create_vpss_chn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+
+        unsigned int width = app_config.http_post_width;
+        unsigned int height = app_config.http_post_height;
+
+        VENC_CHN venc_chn = vpss_chn;
+        app_config.http_post_chn = venc_chn;
+        printf("http_post venc channel: %d\n", app_config.http_post_chn);
         VENC_ATTR_JPEG_S jpeg_attr;
         memset(&jpeg_attr, 0, sizeof(VENC_ATTR_JPEG_S));
         jpeg_attr.u32MaxPicWidth  = width;

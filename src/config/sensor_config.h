@@ -77,8 +77,6 @@ struct SensorVIDEV {
     unsigned int dev_rect_h;
 };
 
-
-
 struct SensorISP {
     int isp_x;
     int isp_y;
@@ -86,8 +84,8 @@ struct SensorISP {
     unsigned int isp_w;
     unsigned int isp_frame_rate;
     ISP_BAYER_FORMAT_E isp_bayer;
-
 };
+
 struct SensorVIChn {
     int cap_rect_x;
     int cap_rect_y;
