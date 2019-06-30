@@ -1,4 +1,7 @@
 #pragma once
+#include <stdbool.h>
+#include <stdint.h>
+
 #include <mpi_sys.h>
 #include <mpi_vb.h>
 #include <mpi_vi.h>
@@ -14,10 +17,19 @@ struct SDKState {
     VI_DEV vi_dev;
     VI_CHN vi_chn;
     VPSS_GRP vpss_grp;
-    VPSS_CHN next_free_channel;
 
     MD_CHN md_chn;
 };
+extern struct SDKState state;
+// extern bool VencEnabled[VENC_MAX_CHN_NUM];
 
-int start_sdk(struct SDKState *state);
-int stop_sdk(struct SDKState *state);
+int start_sdk();
+int stop_sdk();
+
+uint32_t take_next_free_channel(bool in_main_loop);
+bool channel_is_enable(uint32_t channel);
+bool channel_main_loop(uint32_t channel);
+void set_channel_disable(uint32_t channel);
+
+HI_S32 create_vpss_chn(int vpss_grp, int vpss_chn, uint32_t fps_src, uint32_t fps_dst);
+HI_S32 disable_channel(uint32_t vpss_grp, uint32_t channel_id);

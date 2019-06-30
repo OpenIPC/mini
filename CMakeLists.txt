@@ -66,6 +66,8 @@ add_executable(minihttp
     src/motion_detect.c
     src/http_post.h
     src/http_post.c
+    src/hi_jpeg.h
+    src/hi_jpeg.c
     src/main.c
 )
 target_link_libraries( minihttp pthread ${HILIBS} )

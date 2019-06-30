@@ -16,6 +16,8 @@
 
 #include "chipid.h"
 
+#include "http_post.h"
+
 // void Usage(char *sPrgNm) {
 //     printf("Usage : %s <path to sensor config ini>\n", sPrgNm);
 //     printf("   ex: %s ./configs/imx222_1080p_line.ini\n", sPrgNm);
@@ -32,7 +34,6 @@ int main(int argc, char *argv[]) {
 
     start_server();
 
-    struct SDKState state;
     memset(&state, 0, sizeof(struct SDKState));
 
     int s32MainFd;
@@ -52,6 +53,7 @@ int main(int argc, char *argv[]) {
     if(start_sdk(&state) == EXIT_FAILURE) keepRunning = 0; // return EXIT_FAILURE;
     // TODO when return EXIT_FAILURE need to deinitialize sdk correctly
 
+    if (app_config.http_post_enable) start_http_post_send();
     if (app_config.rtsp_enable) {
         struct timespec ts = { 2, 0 };
         while (keepRunning) {

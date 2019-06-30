@@ -16,6 +16,8 @@
 
 #include "tools.h"
 
+#include "hi_jpeg.h"
+
 #include "config/app_config.h"
 
 bool keepRunning = true; // keep running infinite loop while true
@@ -230,6 +232,21 @@ void send_jpeg(uint8_t chn_index, char *buf, ssize_t size) {
     pthread_mutex_unlock(&client_fds_mutex);
 }
 
+void* send_jpeg_thread(void *vargp) {
+    int client_fd = *((int *) vargp);
+    struct JpegData jpeg = {0};
+    HI_S32 s32Ret = get_jpeg(app_config.jpeg_width, app_config.jpeg_height, &jpeg);
+    if (s32Ret != HI_SUCCESS) return NULL;
+    char buf[1024];
+    int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: %lu\r\nConnection: close\r\n\r\n", jpeg.jpeg_size);
+    send_to_fd(client_fd, buf, buf_len);
+    send_to_fd(client_fd, jpeg.buf, jpeg.jpeg_size);
+    send_to_fd(client_fd, "\r\n", 2);
+    close_socket_fd(client_fd);
+    free(jpeg.buf);
+    return NULL;
+}
+
 int send_file(const int client_fd, const char *path) {
     if(access(path, F_OK) != -1) { // file exists
         const char* mime = getMime(path);
@@ -402,11 +419,27 @@ void *server_thread(void *vargp) {
             continue;
         }
 
+//        if (strcmp(request_path, "./image.jpg") == 0 && app_config.jpeg_enable) {
+//            pthread_mutex_lock(&client_fds_mutex);
+//            for (uint32_t i = 0; i < MAX_CLIENTS; ++i)
+//                if (client_fds[i].socket_fd < 0) { client_fds[i].socket_fd = client_fd; client_fds[i].type = STREAM_JPEG; break; }
+//            pthread_mutex_unlock(&client_fds_mutex);
+//            continue;
+//        }
+
         if (strcmp(request_path, "./image.jpg") == 0 && app_config.jpeg_enable) {
-            pthread_mutex_lock(&client_fds_mutex);
-            for (uint32_t i = 0; i < MAX_CLIENTS; ++i)
-                if (client_fds[i].socket_fd < 0) { client_fds[i].socket_fd = client_fd; client_fds[i].type = STREAM_JPEG; break; }
-            pthread_mutex_unlock(&client_fds_mutex);
+            {
+                pthread_t thread_id;
+                pthread_attr_t thread_attr;
+                pthread_attr_init(&thread_attr);
+                size_t stacksize;
+                pthread_attr_getstacksize(&thread_attr,&stacksize);
+                size_t new_stacksize = 16*1024;
+                if (pthread_attr_setstacksize(&thread_attr, new_stacksize)) { printf("Error:  Can't set stack size %ld\n", new_stacksize); }
+                pthread_create(&thread_id, &thread_attr, send_jpeg_thread, (void *) &client_fd);
+                if (pthread_attr_setstacksize(&thread_attr, stacksize)) { printf("Error:  Can't set stack size %ld\n", stacksize); }
+                pthread_attr_destroy(&thread_attr);
+            }
             continue;
         }
 
