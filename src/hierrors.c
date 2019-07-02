@@ -256,6 +256,34 @@ char * hi_errstr(int error) {
         case 0xA064800C: return "ERR_TDE_QUERY_TIMEOUT (0xA064800C): The specific task is not complete due to timeout.";
         case 0xA064800E: return "ERR_TDE_INTERRUPT (0xA064800E): Waiting for task completion is interrupted.";
 
+        case 0xA01D8001: return "HI_ERR_IVE_INVALID_DEVID (0xA01D8001): The device ID is invalid.";
+        case 0xA01D8002: return "HI_ERR_IVE_INVALID_CHNID (0xA01D8002): The channel group ID or the region handle is invalid.";
+        case 0xA01D8003: return "HI_ERR_IVE_ILLEGAL_PARAM (0xA01D8003): The parameter is invalid.";
+        case 0xA01D8004: return "HI_ERR_IVE_EXIST (0xA01D8004): The device, channel, or resource to be created already exists.";
+        case 0xA01D8005: return "HI_ERR_IVE_UNEXIST (0xA01D8005): The device, channel, or resource to be used or destroyed does not exist.";
+        case 0xA01D8006: return "HI_ERR_IVE_NULL_PTR (0xA01D8006): The pointer is null.";
+        case 0xA01D8007: return "HI_ERR_IVE_NOT_CONFIG (0xA01D8007): The module is not configured.";
+        case 0xA01D8008: return "HI_ERR_IVE_NOT_SUPPORT (0xA01D8008): The parameter or function is not supported.";
+        case 0xA01D8009: return "HI_ERR_IVE_NOT_PERM (0xA01D8009): The operation, for example, modifying the value of a static parameter, is forbidden.";
+        case 0xA01D800C: return "HI_ERR_IVE_NOMEM (0xA01D800C): The memory fails to be allocated for the reasons such as system memory insufficiency.";
+        case 0xA01D800D: return "HI_ERR_IVE_NOBUF (0xA01D800D): The buffer fails to be allocated. The reason may be that the requested picture buffer is too large.";
+        case 0xA01D800E: return "HI_ERR_IVE_BUF_EMPTY (0xA01D800E): There is no picture in the buffer.";
+        case 0xA01D800F: return "HI_ERR_IVE_BUF_FULL (0xA01D800F): The buffer is full of pictures.";
+        case 0xA01D8010: return "HI_ERR_IVE_NOTREADY (0xA01D8010): The system is not initialized or the corresponding module driver is not loaded.";
+        case 0xA01D8011: return "HI_ERR_IVE_BADADDR (0xA01D8011): The address is invalid.";
+        case 0xA01D8012: return "HI_ERR_IVE_BUSY (0xA01D8012): The system is busy.";
+        case 0xA01D8040: return "HI_ERR_IVE_SYS_TIMEOUT (0xA01D8040): The IVE times out.";
+        case 0xA01D8041: return "HI_ERR_IVE_QUERY_TIMEOUT (0xA01D8041): The query times out.";
+        case 0xA01D8042: return "HI_ERR_IVE_OPEN_FILE (0xA01D8042): Opening a file fails.";
+        case 0xA01D8043: return "HI_ERR_IVE_READ_FILE (0xA01D8043): Reading a file fails.";
+        case 0xA01D8044: return "HI_ERR_IVE_WRITE_FILE (0xA01D8044): Writing to a file fails.";
+        case 0xA0308002: return "HI_ERR_ODT_INVALID_CHNID (0xA0308002): The on-die termination (ODT) channel group ID or the region handle is invalid.";
+        case 0xA0308004: return "HI_ERR_ODT_EXIST (0xA0308004): The device, channel, or resource to be created already exists.";
+        case 0xA0308005: return "HI_ERR_ODT_UNEXIST (0xA0308005): The device, channel, or resource to be used or destroyed does not exist.";
+        case 0xA0308009: return "HI_ERR_ODT_NOT_PERM (0xA0308009): The operation, for example, modifying the value of a static parameter, is forbidden.";
+        case 0xA0308010: return "HI_ERR_ODT_NOTREADY (0xA0308010): The ODT is not initialized.";
+        case 0xA0308012: return "HI_ERR_ODT_BUSY (0xA0308012): The ODT is busy.";
+
         default: {
             static char err_buf[64];
             int len = sprintf(err_buf, "Unknown error code (%X).", error);

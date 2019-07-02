@@ -226,7 +226,7 @@ void* send_thread(void *vargp)  {
     jpeg.buf = NULL;
     jpeg.buf_size = 0;
     jpeg.jpeg_size = 0;
-
+    sleep(3);
     while (keepRunning) {
         static time_t last_time = 0;
         time_t current_time = time(NULL);

@@ -16,7 +16,7 @@ struct SDKState {
     ISP_DEV isp_dev;
     VI_DEV vi_dev;
     VI_CHN vi_chn;
-    VPSS_GRP vpss_grp;
+    // VPSS_GRP vpss_grp;
 
     MD_CHN md_chn;
 };
@@ -26,10 +26,18 @@ extern struct SDKState state;
 int start_sdk();
 int stop_sdk();
 
+
+void set_color2gray(bool color2gray);
+
 uint32_t take_next_free_channel(bool in_main_loop);
 bool channel_is_enable(uint32_t channel);
 bool channel_main_loop(uint32_t channel);
 void set_channel_disable(uint32_t channel);
+//
+//HI_S32 create_vpss_chn(VPSS_GRP vpss_grp, VENC_CHN vpss_chn, uint32_t fps_src, uint32_t fps_dst);
+//
+//HI_S32 disable_venc_chn(VENC_CHN venc_chn, VPSS_GRP vpss_grp, VENC_CHN vpss_chn);
 
-HI_S32 create_vpss_chn(int vpss_grp, int vpss_chn, uint32_t fps_src, uint32_t fps_dst);
-HI_S32 disable_channel(uint32_t vpss_grp, uint32_t channel_id);
+
+HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst);
+HI_S32 disable_venc_chn(VENC_CHN venc_chn);

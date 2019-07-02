@@ -36,6 +36,10 @@ enum ConfigError parse_app_config(const char *path) {
     app_config.blk_cnt = 4;
     app_config.max_pool_cnt = 16;
 
+    app_config.ir_sensor_pin = 999;
+    app_config.ir_cut_enable_pin = 999;
+    app_config.ir_cut_disable_pin = 999;
+
     struct IniConfig ini;
     memset(&ini, 0, sizeof(struct IniConfig));
 
@@ -71,6 +75,14 @@ enum ConfigError parse_app_config(const char *path) {
     err = parse_int(&ini, "system", "isp_thread_stack_size", 16*1024, INT_MAX, &app_config.isp_thread_stack_size); if(err != CONFIG_OK) goto RET_ERR;
     err = parse_int(&ini, "system", "venc_stream_thread_stack_size", 16*1024, INT_MAX, &app_config.venc_stream_thread_stack_size); if(err != CONFIG_OK) goto RET_ERR;
     err = parse_int(&ini, "system", "web_server_thread_stack_size", 16*1024, INT_MAX, &app_config.web_server_thread_stack_size); if(err != CONFIG_OK) goto RET_ERR;
+
+    err = parse_bool(&ini, "night_mode", "enable", &app_config.night_mode_enable); if (err != CONFIG_OK) goto RET_ERR;
+    if (app_config.night_mode_enable) {
+        #define PIN_MAX 95
+        err = parse_int(&ini, "night_mode", "ir_sensor_pin", 0, PIN_MAX, &app_config.ir_sensor_pin); if(err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "night_mode", "ir_cut_enable_pin", 0, PIN_MAX, &app_config.ir_cut_enable_pin); if(err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "night_mode", "ir_cut_disable_pin", 0, PIN_MAX, &app_config.ir_cut_disable_pin); if(err != CONFIG_OK) goto RET_ERR;
+    }
 
     {
         const char* possible_values[] = { "1", "4", "16", "64", "128" };

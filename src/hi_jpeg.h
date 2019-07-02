@@ -10,4 +10,6 @@ struct JpegData {
     ssize_t jpeg_size;
 };
 
-int get_jpeg(uint32_t width, uint32_t height, struct JpegData *jpeg_buf);
+int32_t InitJPEG();
+int32_t DestroyJPEG();
+int32_t get_jpeg(uint32_t width, uint32_t height, struct JpegData *jpeg_buf);

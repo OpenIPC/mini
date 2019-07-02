@@ -31,6 +31,7 @@
 
 #include "config/app_config.h"
 
+#include "hi_jpeg.h"
 #include "http_post.h"
 #include "motion_detect.h"
 
@@ -120,6 +121,7 @@ uint32_t take_next_free_channel(bool in_main_loop) {
         if (!VencS[i].enable) {
             VencS[i].enable = true;
             VencS[i].in_main_loop = in_main_loop;
+            // printf("take_next_free_channel %d\n", i);
             pthread_mutex_unlock(&mutex);
             return i;
         }
@@ -127,9 +129,39 @@ uint32_t take_next_free_channel(bool in_main_loop) {
     pthread_mutex_unlock(&mutex);
     return -1;
 }
-bool channel_is_enable(uint32_t channel) { pthread_mutex_lock(&mutex); bool enable = VencS[channel].enable; pthread_mutex_unlock(&mutex); return enable; }
-bool channel_main_loop(uint32_t channel) {pthread_mutex_lock(&mutex); bool in_main_loop = VencS[channel].in_main_loop; pthread_mutex_unlock(&mutex); return in_main_loop; }
-void set_channel_disable(uint32_t channel) {pthread_mutex_lock(&mutex); VencS[channel].enable = false; pthread_mutex_unlock(&mutex); }
+bool channel_is_enable(uint32_t channel) {
+    pthread_mutex_lock(&mutex);
+    bool enable = VencS[channel].enable;
+    pthread_mutex_unlock(&mutex);
+    return enable;
+}
+bool channel_main_loop(uint32_t channel) {
+    pthread_mutex_lock(&mutex);
+    bool in_main_loop = VencS[channel].in_main_loop;
+    pthread_mutex_unlock(&mutex);
+    return in_main_loop;
+}
+void set_channel_disable(uint32_t channel) {
+    pthread_mutex_lock(&mutex);
+    // printf("set_channel_disable %d\n", channel);
+    VencS[channel].enable = false;
+    pthread_mutex_unlock(&mutex);
+}
+
+void set_color2gray(bool color2gray) {
+    pthread_mutex_lock(&mutex);
+    for (int venc_chn = 0; venc_chn < VENC_MAX_CHN_NUM; venc_chn++) {
+        if (VencS[venc_chn].enable) {
+            VENC_COLOR2GREY_S pstChnColor2Grey;
+            pstChnColor2Grey.bColor2Grey = color2gray;
+            HI_S32 s32Ret = HI_MPI_VENC_SetColor2Grey(venc_chn, &pstChnColor2Grey);
+//            if (HI_SUCCESS != s32Ret) {
+//                printf(tag "HI_MPI_VENC_CreateChn(%d) failed with %#x!\n%s\n", jpeg_venc_chn, s32Ret, hi_errstr(s32Ret));
+//            }
+        }
+    }
+    pthread_mutex_unlock(&mutex);
+}
 
 HI_VOID* VENC_GetVencStreamProc(HI_VOID *p) {
     HI_S32 maxfd = 0;
@@ -172,7 +204,7 @@ HI_VOID* VENC_GetVencStreamProc(HI_VOID *p) {
         TimeoutVal.tv_usec = 0;
         s32Ret = select(maxfd + 1, &read_fds, NULL, NULL, &TimeoutVal);
         if (s32Ret < 0) { printf("select failed!\n"); break; }
-        else if (s32Ret == 0) { printf("get sample_venc stream time out, exit thread\n"); continue; }
+        else if (s32Ret == 0) { printf("get main loop stream time out, exit thread\n"); continue; }
         else {
             for (HI_S32 chn_index = 0; chn_index < VENC_MAX_CHN_NUM; chn_index++) {
                 if (!channel_is_enable(chn_index)) continue;
@@ -205,7 +237,16 @@ HI_VOID* VENC_GetVencStreamProc(HI_VOID *p) {
     return NULL;
 }
 
-HI_S32 create_vpss_chn(int vpss_grp, int vpss_chn, uint32_t fps_src, uint32_t fps_dst) {
+//HI_S32 bind_venc_chn(VENC_CHN venc_chn) {
+//
+//    VPSS_GRP vpss_grp = venc_chn / VPSS_MAX_CHN_NUM;
+//    VPSS_CHN vpss_chn = venc_chn - vpss_grp * VPSS_MAX_CHN_NUM;
+//}
+HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst) {
+    VPSS_GRP vpss_grp = venc_chn / VPSS_MAX_CHN_NUM;
+    VPSS_CHN vpss_chn = venc_chn - vpss_grp * VPSS_MAX_CHN_NUM;
+    printf("new venc: %d   vpss_grp: %d,   vpss_chn: %d\n", venc_chn, vpss_grp, vpss_chn);
+
     VPSS_CHN_ATTR_S vpss_chn_attr;
     memset(&vpss_chn_attr, 0, sizeof(VPSS_CHN_ATTR_S));
     vpss_chn_attr.bSpEn = HI_FALSE;
@@ -220,7 +261,7 @@ HI_S32 create_vpss_chn(int vpss_grp, int vpss_chn, uint32_t fps_src, uint32_t fp
     vpss_chn_attr.stBorder.u32RightWidth = 0;
     vpss_chn_attr.stBorder.u32Color = 0;
     HI_S32 s32Ret = HI_MPI_VPSS_SetChnAttr(vpss_grp, vpss_chn, &vpss_chn_attr);
-    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_SetChnAttr failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_SetChnAttr(%d, %d, ...) failed with %#x!\n%s\n", vpss_grp, vpss_chn, s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
 
     VPSS_CHN_MODE_S vpss_chn_mode;
     memset(&vpss_chn_mode, 0, sizeof(VPSS_CHN_MODE_S));
@@ -236,8 +277,51 @@ HI_S32 create_vpss_chn(int vpss_grp, int vpss_chn, uint32_t fps_src, uint32_t fp
     s32Ret = HI_MPI_VPSS_EnableChn(vpss_grp, vpss_chn);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_EnableChn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
 
+    MPP_CHN_S src_chn;
+    memset(&src_chn, 0, sizeof(MPP_CHN_S));
+    src_chn.enModId = HI_ID_VPSS;
+    src_chn.s32DevId = vpss_grp;
+    src_chn.s32ChnId = vpss_chn;
+    MPP_CHN_S dest_chn;
+    memset(&dest_chn, 0, sizeof(MPP_CHN_S));
+    dest_chn.enModId = HI_ID_VENC;
+    dest_chn.s32DevId = 0;
+    dest_chn.s32ChnId = venc_chn;
+    s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
+    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return HI_FAILURE; }
+
+
     return HI_SUCCESS;
 }
+
+HI_S32 disable_venc_chn(VENC_CHN venc_chn) {
+    HI_S32 s32Ret;
+    VPSS_GRP vpss_grp = venc_chn / VPSS_MAX_CHN_NUM;
+    VPSS_CHN vpss_chn = venc_chn - vpss_grp * VPSS_MAX_CHN_NUM;
+
+    s32Ret = HI_MPI_VENC_StopRecvPic(venc_chn);
+    // if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_StopRecvPic(%d) failed with %#x!\n%s\n", venc_chn, s32Ret, hi_errstr(s32Ret)); /* return EXIT_FAILURE; */ }
+    {
+        MPP_CHN_S src_chn;
+        src_chn.enModId = HI_ID_VPSS;
+        src_chn.s32DevId = vpss_grp;
+        src_chn.s32ChnId = vpss_chn;
+        MPP_CHN_S dest_chn;
+        dest_chn.enModId = HI_ID_VENC;
+        dest_chn.s32DevId = 0;
+        dest_chn.s32ChnId = venc_chn;
+        s32Ret = HI_MPI_SYS_UnBind(&src_chn, &dest_chn);
+        // if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_UnBind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); /* return EXIT_FAILURE; */ }
+    }
+    s32Ret = HI_MPI_VENC_DestroyChn(venc_chn);
+    // if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_DestroyChn(%d) failed with %#x!\n%s\n", venc_chn,  s32Ret, hi_errstr(s32Ret)); /* return EXIT_FAILURE; */ }
+
+    s32Ret = HI_MPI_VPSS_DisableChn(vpss_grp, vpss_chn);
+    // if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_DisableChn(%d, %d) failed with %#x!\n%s\n", vpss_grp, vpss_chn, s32Ret, hi_errstr(s32Ret)); /* return EXIT_FAILURE; */ }
+
+    set_channel_disable(venc_chn);
+    return HI_SUCCESS;
+};
 
 int SYS_CalcPicVbBlkSize(unsigned int width, unsigned int height, PIXEL_FORMAT_E enPixFmt, HI_U32 u32AlignWidth) {
 //    if (PIXEL_FORMAT_YUV_SEMIPLANAR_422 != enPixFmt && PIXEL_FORMAT_YUV_SEMIPLANAR_420 != enPixFmt) {
@@ -458,113 +542,92 @@ int start_sdk() {
     s32Ret = HI_MPI_VI_EnableChn(state.vi_chn);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VI_EnableChn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
 
-    state.vpss_grp = 0;
-    VPSS_GRP_ATTR_S vpss_grp_attr;
-    memset(&vpss_grp_attr, 0, sizeof(VPSS_GRP_ATTR_S));
-    vpss_grp_attr.u32MaxW = sensor_config.vichn.dest_size_width;
-    vpss_grp_attr.u32MaxH = sensor_config.vichn.dest_size_height;
-    vpss_grp_attr.enPixFmt = sensor_config.vichn.pix_format;
-    vpss_grp_attr.bIeEn = HI_FALSE;
-    vpss_grp_attr.bDciEn = HI_FALSE;
-    vpss_grp_attr.bNrEn = HI_TRUE;
-    vpss_grp_attr.bHistEn = HI_FALSE;
-    vpss_grp_attr.enDieMode = VPSS_DIE_MODE_NODIE;
-    s32Ret = HI_MPI_VPSS_CreateGrp(state.vpss_grp, &vpss_grp_attr);
-    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_CreateGrp failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
-
-    s32Ret = HI_MPI_VPSS_StartGrp(state.vpss_grp);
-    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_StartGrp failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+    HI_U32 mode;
+    s32Ret = HI_MPI_SYS_GetViVpssMode(&mode);
+    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_GetViVpssMode failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+    bool online_mode = mode == 1;
+    printf("SDK is in '%s' mode\n", online_mode ? "online" : "offline");
 
     {
-        MPP_CHN_S src_chn;
-        src_chn.enModId = HI_ID_VIU;
-        src_chn.s32DevId = 0;
-        src_chn.s32ChnId = 0;
-        MPP_CHN_S dest_chn;
-        dest_chn.enModId = HI_ID_VPSS;
-        dest_chn.s32DevId = 0;
-        dest_chn.s32ChnId = 0;
-        s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
-        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+        VPSS_GRP vpss_grp = 0;
+        VPSS_GRP_ATTR_S vpss_grp_attr;
+        memset(&vpss_grp_attr, 0, sizeof(VPSS_GRP_ATTR_S));
+        vpss_grp_attr.u32MaxW = sensor_config.vichn.dest_size_width;
+        vpss_grp_attr.u32MaxH = sensor_config.vichn.dest_size_height;
+        vpss_grp_attr.enPixFmt = sensor_config.vichn.pix_format;
+        vpss_grp_attr.bIeEn = HI_FALSE;
+        vpss_grp_attr.bDciEn = HI_FALSE;
+        vpss_grp_attr.bNrEn = HI_TRUE;
+        vpss_grp_attr.bHistEn = HI_FALSE;
+        vpss_grp_attr.enDieMode = VPSS_DIE_MODE_NODIE;
+        s32Ret = HI_MPI_VPSS_CreateGrp(vpss_grp, &vpss_grp_attr);
+        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_CreateGrp(%d, ...) failed with %#x!\n%s\n", vpss_grp, s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+
+        s32Ret = HI_MPI_VPSS_StartGrp(vpss_grp);
+        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_StartGrp(%d) failed with %#x!\n%s\n", vpss_grp, s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+
+        {
+            MPP_CHN_S src_chn;
+            src_chn.enModId = HI_ID_VIU;
+            src_chn.s32DevId = 0;
+            src_chn.s32ChnId = 0;
+            MPP_CHN_S dest_chn;
+            dest_chn.enModId = HI_ID_VPSS;
+            dest_chn.s32DevId = vpss_grp;
+            dest_chn.s32ChnId = 0;
+            s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
+            if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+        }
     }
-
-//    state.vpss_chn = 0;
-//    VPSS_CHN_ATTR_S vpss_chn_attr;
-//    memset(&vpss_chn_attr, 0, sizeof(VPSS_CHN_ATTR_S));
-//    vpss_chn_attr.bSpEn = HI_FALSE;
-//    vpss_chn_attr.bBorderEn = HI_FALSE;
-//    vpss_chn_attr.bMirror = HI_FALSE;
-//    vpss_chn_attr.bFlip = HI_FALSE;
-//    vpss_chn_attr.s32SrcFrameRate = -1;
-//    vpss_chn_attr.s32DstFrameRate = -1;
-//    vpss_chn_attr.stBorder.u32TopWidth = 0;
-//    vpss_chn_attr.stBorder.u32BottomWidth = 0;
-//    vpss_chn_attr.stBorder.u32LeftWidth = 0;
-//    vpss_chn_attr.stBorder.u32RightWidth = 0;
-//    vpss_chn_attr.stBorder.u32Color = 0;
-//    s32Ret = HI_MPI_VPSS_SetChnAttr(state.vpss_grp, state.vpss_chn, &vpss_chn_attr);
-//    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_SetChnAttr failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
 //
-//    VPSS_CHN_MODE_S vpss_chn_mode;
-//    memset(&vpss_chn_mode, 0, sizeof(VPSS_CHN_MODE_S));
-//    vpss_chn_mode.enChnMode = VPSS_CHN_MODE_USER;
-//    vpss_chn_mode.u32Width = sensor_config.vichn.dest_size_width;
-//    vpss_chn_mode.u32Height = sensor_config.vichn.dest_size_height;
-//    vpss_chn_mode.bDouble = HI_FALSE;
-//    vpss_chn_mode.enPixelFormat = sensor_config.vichn.pix_format;
-//    vpss_chn_mode.enCompressMode = sensor_config.vichn.compress_mode;
-//    s32Ret = HI_MPI_VPSS_SetChnMode(state.vpss_grp, state.vpss_chn, &vpss_chn_mode);
-//    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_SetChnMode failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+//    // OSD
+//    if (app_config.osd_enable) {
+//        RGN_HANDLE rgn_handle = 0;
 //
-//    s32Ret = HI_MPI_VPSS_EnableChn(state.vpss_grp, state.vpss_chn);
-//    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_EnableChn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
-
-    // OSD
-    if (app_config.osd_enable) {
-        RGN_HANDLE rgn_handle = 0;
-
-        RGN_ATTR_S rgn_attr;
-        memset(&rgn_attr, 0, sizeof(RGN_ATTR_S));
-        rgn_attr.enType = COVER_RGN;
-        s32Ret = HI_MPI_RGN_Create(rgn_handle, &rgn_attr);
-        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_RGN_Create failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
-
-        MPP_CHN_S mpp_chn;
-        memset(&mpp_chn, 0, sizeof(MPP_CHN_S));
-        mpp_chn.enModId = HI_ID_VPSS;
-        mpp_chn.s32DevId = state.vpss_grp;
-        mpp_chn.s32ChnId = 0;
-
-        RGN_CHN_ATTR_S rgn_chn_attr;
-        memset(&rgn_chn_attr, 0, sizeof(RGN_CHN_ATTR_S));
-        rgn_chn_attr.enType = COVER_RGN;
-        rgn_chn_attr.bShow = true;
-        rgn_chn_attr.unChnAttr.stCoverChn.enCoverType = AREA_QUAD_RANGLE;
-        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.bSolid = HI_TRUE;
-        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.u32Thick = 2;
-        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[0].s32X = 50;
-        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[0].s32Y = 0;
-        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[1].s32X = 50 + 50;
-        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[1].s32Y = 50;
-        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[2].s32X = 50 + 50;
-        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[2].s32Y = 300;
-        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[3].s32X = 50;
-        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[3].s32Y = 200;
-        rgn_chn_attr.unChnAttr.stCoverChn.u32Color         = 0x000000ff;
-        s32Ret = HI_MPI_RGN_AttachToChn(rgn_handle, &mpp_chn, &rgn_chn_attr);
-        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_RGN_AttachToChn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
-    }
+//        RGN_ATTR_S rgn_attr;
+//        memset(&rgn_attr, 0, sizeof(RGN_ATTR_S));
+//        rgn_attr.enType = COVER_RGN;
+//        s32Ret = HI_MPI_RGN_Create(rgn_handle, &rgn_attr);
+//        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_RGN_Create failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+//
+//        MPP_CHN_S mpp_chn;
+//        memset(&mpp_chn, 0, sizeof(MPP_CHN_S));
+//        mpp_chn.enModId = HI_ID_VPSS;
+//        mpp_chn.s32DevId = 0;
+//        mpp_chn.s32ChnId = 0;
+//
+//        RGN_CHN_ATTR_S rgn_chn_attr;
+//        memset(&rgn_chn_attr, 0, sizeof(RGN_CHN_ATTR_S));
+//        rgn_chn_attr.enType = COVER_RGN;
+//        rgn_chn_attr.bShow = true;
+//        rgn_chn_attr.unChnAttr.stCoverChn.enCoverType = AREA_QUAD_RANGLE;
+//        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.bSolid = HI_TRUE;
+//        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.u32Thick = 2;
+//        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[0].s32X = 50;
+//        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[0].s32Y = 0;
+//        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[1].s32X = 50 + 50;
+//        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[1].s32Y = 50;
+//        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[2].s32X = 50 + 50;
+//        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[2].s32Y = 300;
+//        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[3].s32X = 50;
+//        rgn_chn_attr.unChnAttr.stCoverChn.stQuadRangle.stPoint[3].s32Y = 200;
+//        rgn_chn_attr.unChnAttr.stCoverChn.u32Color         = 0x000000ff;
+//        s32Ret = HI_MPI_RGN_AttachToChn(rgn_handle, &mpp_chn, &rgn_chn_attr);
+//        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_RGN_AttachToChn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+//    }
 
     // config venc
     if (app_config.mp4_enable) {
-        VPSS_CHN vpss_chn = take_next_free_channel(true);
-        s32Ret = create_vpss_chn(state.vpss_grp, vpss_chn, sensor_config.isp.isp_frame_rate, app_config.mp4_fps);
+        VENC_CHN venc_chn = take_next_free_channel(true);
+//        VPSS_GRP vpss_grp = venc_chn % VPSS_MAX_CHN_NUM;
+//        VPSS_CHN vpss_chn = venc_chn - vpss_grp * VPSS_MAX_CHN_NUM;
+
+        s32Ret = create_venc_chn(venc_chn, sensor_config.isp.isp_frame_rate, app_config.mp4_fps);
         if (HI_SUCCESS != s32Ret) { printf("create_vpss_chn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
 
         unsigned int width = app_config.mp4_width;
         unsigned int height = app_config.mp4_height;
 
-        VENC_CHN venc_chn = vpss_chn;
         VENC_CHN_ATTR_S venc_chn_attr;
         memset(&venc_chn_attr, 0, sizeof(VENC_CHN_ATTR_S));
 
@@ -596,23 +659,23 @@ int start_sdk() {
         s32Ret = HI_MPI_VENC_CreateChn(venc_chn, &venc_chn_attr);
         if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_CreateChn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
 
-        MPP_CHN_S src_chn;
-        memset(&src_chn, 0, sizeof(MPP_CHN_S));
-        src_chn.enModId = HI_ID_VPSS;
-        src_chn.s32DevId = 0;
-        src_chn.s32ChnId = vpss_chn;
-        MPP_CHN_S dest_chn;
-        memset(&dest_chn, 0, sizeof(MPP_CHN_S));
-        dest_chn.enModId = HI_ID_VENC;
-        dest_chn.s32DevId = 0;
-        dest_chn.s32ChnId = venc_chn;
-        s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
-        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return HI_FAILURE; }
+//        MPP_CHN_S src_chn;
+//        memset(&src_chn, 0, sizeof(MPP_CHN_S));
+//        src_chn.enModId = HI_ID_VPSS;
+//        src_chn.s32DevId = 0;
+//        src_chn.s32ChnId = vpss_chn;
+//        MPP_CHN_S dest_chn;
+//        memset(&dest_chn, 0, sizeof(MPP_CHN_S));
+//        dest_chn.enModId = HI_ID_VENC;
+//        dest_chn.s32DevId = 0;
+//        dest_chn.s32ChnId = venc_chn;
+//        s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
+//        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return HI_FAILURE; }
 
         s32Ret = HI_MPI_VENC_StartRecvPic(venc_chn);
         if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_StartRecvPic failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
     }
-//
+
 //    if (app_config.jpeg_enable) {
 //        VPSS_CHN vpss_chn = take_next_free_channel(true);
 //        s32Ret = create_vpss_chn(state.vpss_grp, vpss_chn, sensor_config.isp.isp_frame_rate, app_config.jpeg_fps);
@@ -705,11 +768,11 @@ int start_sdk() {
 //    }
 
     if (app_config.mjpeg_enable) {
-        VPSS_CHN vpss_chn = take_next_free_channel(true);
-        s32Ret = create_vpss_chn(state.vpss_grp, vpss_chn, sensor_config.isp.isp_frame_rate, app_config.mjpeg_fps);
+        VENC_CHN venc_chn = take_next_free_channel(true);
+
+        s32Ret = create_venc_chn(venc_chn, sensor_config.isp.isp_frame_rate, app_config.mjpeg_fps);
         if (HI_SUCCESS != s32Ret) { printf("create_vpss_chn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
 
-        VENC_CHN venc_chn = vpss_chn;
         VENC_CHN_ATTR_S venc_chn_attr;
         memset(&venc_chn_attr, 0, sizeof(VENC_CHN_ATTR_S));
 
@@ -736,22 +799,12 @@ int start_sdk() {
         s32Ret = HI_MPI_VENC_CreateChn(venc_chn, &venc_chn_attr);
         if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_CreateChn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
 
-        MPP_CHN_S src_chn;
-        memset(&src_chn, 0, sizeof(MPP_CHN_S));
-        src_chn.enModId = HI_ID_VPSS;
-        src_chn.s32DevId = 0;
-        src_chn.s32ChnId = vpss_chn;
-        MPP_CHN_S dest_chn;
-        memset(&dest_chn, 0, sizeof(MPP_CHN_S));
-        dest_chn.enModId = HI_ID_VENC;
-        dest_chn.s32DevId = 0;
-        dest_chn.s32ChnId = venc_chn;
-        s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
-        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return HI_FAILURE; }
-
         s32Ret = HI_MPI_VENC_StartRecvPic(venc_chn);
         if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_StartRecvPic failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
     }
+
+    s32Ret = InitJPEG();
+    if (HI_SUCCESS != s32Ret) { printf("Init_JPEG() failed with %#x!\n", s32Ret); return EXIT_FAILURE; }
 
     {
         pthread_attr_t thread_attr;
@@ -764,68 +817,50 @@ int start_sdk() {
         if (pthread_attr_setstacksize(&thread_attr, stacksize)) { printf("Error:  Can't set stack size %ld\n", stacksize); }
         pthread_attr_destroy(&thread_attr);
     }
+
     printf("Start sdk Ok!\n");
     return EXIT_SUCCESS;
 }
 
-HI_S32 disable_channel(uint32_t vpss_grp, uint32_t channel_id) {
-    HI_S32 s32Ret;
-
-    VENC_CHN venc_chn = channel_id;
-    VENC_CHN vpss_chn = venc_chn;
-    set_channel_disable(channel_id);
-    s32Ret = HI_MPI_VENC_StopRecvPic(venc_chn);
-    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_StopRecvPic failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
-    {
-        MPP_CHN_S src_chn;
-        src_chn.enModId = HI_ID_VPSS;
-        src_chn.s32DevId = 0;
-        src_chn.s32ChnId = vpss_chn;
-        MPP_CHN_S dest_chn;
-        dest_chn.enModId = HI_ID_VENC;
-        dest_chn.s32DevId = 0;
-        dest_chn.s32ChnId = venc_chn;
-        s32Ret = HI_MPI_SYS_UnBind(&src_chn, &dest_chn);
-        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_UnBind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
-    }
-    s32Ret = HI_MPI_VENC_DestroyChn(venc_chn);
-    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_DestroyChn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
-
-    s32Ret = HI_MPI_VPSS_DisableChn(vpss_grp, vpss_chn);
-    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_DisableChn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
-
-    return HI_SUCCESS;
-};
 
 int stop_sdk() {
     HI_S32 s32Ret;
     pthread_join(gs_VencPid, NULL);
 
-    for (int i = 0; i < VENC_MAX_CHN_NUM; i++)
-        if (channel_is_enable(i)) disable_channel(state.vpss_grp, i);
+//    s32Ret = DestroyJPEG();
+//    if (HI_SUCCESS != s32Ret) { printf("DestroyJPEG() failed with %#x!\n", s32Ret); return EXIT_FAILURE; }
 
-    {
-        MPP_CHN_S src_chn;
-        src_chn.enModId = HI_ID_VIU;
-        src_chn.s32DevId = 0;
-        src_chn.s32ChnId = 0;
-        MPP_CHN_S dest_chn;
-        dest_chn.enModId = HI_ID_VPSS;
-        dest_chn.s32DevId = 0;
-        dest_chn.s32ChnId = 0;
-        s32Ret = HI_MPI_SYS_UnBind(&src_chn, &dest_chn);
-        if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_UnBind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
-    }
+    for (int i = 0; i < VENC_MAX_CHN_NUM; i++)
+        if (channel_is_enable(i)) disable_venc_chn(i);
 
     if(app_config.motion_detect_enable) {
         s32Ret = motion_detect_deinit();
         if (HI_SUCCESS != s32Ret) { printf("motion_detect_deinit failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
     }
 
-    s32Ret = HI_MPI_VPSS_StopGrp(state.vpss_grp);
-    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_StopGrp failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
-    s32Ret = HI_MPI_VPSS_DestroyGrp(state.vpss_grp);
-    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_DestroyGrp failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+    for (VPSS_GRP vpss_grp = 0; vpss_grp < VPSS_MAX_GRP_NUM; ++vpss_grp ) {
+        for(VPSS_CHN vpss_chn = 0; vpss_chn < VPSS_MAX_CHN_NUM; ++vpss_chn) {
+            s32Ret = HI_MPI_VPSS_DisableChn(vpss_grp, vpss_chn);
+        }
+
+        {
+            MPP_CHN_S src_chn;
+            src_chn.enModId = HI_ID_VIU;
+            src_chn.s32DevId = 0;
+            src_chn.s32ChnId = 0;
+            MPP_CHN_S dest_chn;
+            dest_chn.enModId = HI_ID_VPSS;
+            dest_chn.s32DevId = vpss_grp;
+            dest_chn.s32ChnId = 0;
+            s32Ret = HI_MPI_SYS_UnBind(&src_chn, &dest_chn);
+            if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_UnBind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+        }
+
+        s32Ret = HI_MPI_VPSS_StopGrp(vpss_grp);
+        // if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_StopGrp(%d) failed with %#x!\n%s\n", vpss_grp, s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+        s32Ret = HI_MPI_VPSS_DestroyGrp(vpss_grp);
+        // if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_DestroyGrp(%d) failed with %#x!\n%s\n", vpss_grp, s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+    }
     s32Ret = HI_MPI_VI_DisableChn(state.vi_chn);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VI_DisableChn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
     s32Ret = HI_MPI_VI_DisableDev(state.vi_dev);

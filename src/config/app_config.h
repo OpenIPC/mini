@@ -54,6 +54,12 @@ struct AppConfig {
     uint32_t align_width;
     uint32_t max_pool_cnt;
     uint32_t blk_cnt;
+
+    // [night_mode]
+    bool night_mode_enable;
+    uint32_t ir_cut_enable_pin;
+    uint32_t ir_cut_disable_pin;
+    uint32_t ir_sensor_pin;
 };
 
 extern struct AppConfig app_config;
