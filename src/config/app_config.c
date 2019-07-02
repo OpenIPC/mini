@@ -36,9 +36,12 @@ enum ConfigError parse_app_config(const char *path) {
     app_config.blk_cnt = 4;
     app_config.max_pool_cnt = 16;
 
+    app_config.night_mode_enable = false;
     app_config.ir_sensor_pin = 999;
     app_config.ir_cut_enable_pin = 999;
     app_config.ir_cut_disable_pin = 999;
+    app_config.pin_impulse_delay_us = 250;
+    app_config.sensor_check_interval_s = 10;
 
     struct IniConfig ini;
     memset(&ini, 0, sizeof(struct IniConfig));
@@ -80,8 +83,10 @@ enum ConfigError parse_app_config(const char *path) {
     if (app_config.night_mode_enable) {
         #define PIN_MAX 95
         err = parse_int(&ini, "night_mode", "ir_sensor_pin", 0, PIN_MAX, &app_config.ir_sensor_pin); if(err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "night_mode", "check_interval_s", 0, 600, &app_config.sensor_check_interval_s); if(err != CONFIG_OK) goto RET_ERR;
         err = parse_int(&ini, "night_mode", "ir_cut_enable_pin", 0, PIN_MAX, &app_config.ir_cut_enable_pin); if(err != CONFIG_OK) goto RET_ERR;
         err = parse_int(&ini, "night_mode", "ir_cut_disable_pin", 0, PIN_MAX, &app_config.ir_cut_disable_pin); if(err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "night_mode", "pin_impulse_delay_us", 0, 1000, &app_config.pin_impulse_delay_us); if(err != CONFIG_OK) goto RET_ERR;
     }
 
     {
@@ -112,8 +117,7 @@ enum ConfigError parse_app_config(const char *path) {
     if (app_config.jpeg_enable) {
         err = parse_int(&ini, "jpeg", "width", 160, INT_MAX, &app_config.jpeg_width); if (err != CONFIG_OK) goto RET_ERR;
         err = parse_int(&ini, "jpeg", "height", 120, INT_MAX, &app_config.jpeg_height); if (err != CONFIG_OK) goto RET_ERR;
-        err = parse_int(&ini, "jpeg", "fps", 1, INT_MAX, &app_config.jpeg_fps); if (err != CONFIG_OK) goto RET_ERR;
-        err = parse_int(&ini, "jpeg", "bitrate", 32, INT_MAX, &app_config.jpeg_bitrate); if (err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "jpeg", "qfactor", 1, 99, &app_config.jpeg_qfactor); if (err != CONFIG_OK) goto RET_ERR;
     }
 
     err = parse_bool(&ini, "mjpeg", "enable", &app_config.mjpeg_enable); if (err != CONFIG_OK) goto RET_ERR;
@@ -136,6 +140,7 @@ enum ConfigError parse_app_config(const char *path) {
         err = parse_int(&ini, "http_post", "width", 160, INT_MAX, &app_config.http_post_width); if (err != CONFIG_OK) goto RET_ERR;
         err = parse_int(&ini, "http_post", "height", 120, INT_MAX, &app_config.http_post_height); if (err != CONFIG_OK) goto RET_ERR;
         err = parse_int(&ini, "http_post", "interval", 1, INT_MAX, &app_config.http_post_interval); if (err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "http_post", "qfactor", 1, 99, &app_config.http_post_qfactor); if (err != CONFIG_OK) goto RET_ERR;
     }
 
 

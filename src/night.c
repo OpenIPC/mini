@@ -51,7 +51,7 @@ void impulse_pin(uint32_t pin) {
     FILE *file = fopen(str_buf, "w");
     fwrite("1", 1, 1, file);
     fflush(file);
-    usleep(250);
+    usleep(app_config.pin_impulse_delay_us);
     fwrite("0", 1, 1, file);
     fflush(file);
     fclose(file);
@@ -112,7 +112,7 @@ void* night_thread_func(void *vargp)  {
             set_night_mode(current_night_mode);
             night_mode = current_night_mode;
         }
-        sleep(1);
+        sleep(app_config.sensor_check_interval_s);
     }
 }
 

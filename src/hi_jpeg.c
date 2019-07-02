@@ -162,7 +162,7 @@ HI_S32 get_stream(int fd, int venc_chn, struct JpegData *jpeg_buf) {
 }
 
 
-int32_t request_pic(uint32_t width, uint32_t height, struct JpegData *jpeg_buf) {
+int32_t request_pic(uint32_t width, uint32_t height, uint32_t qfactor, struct JpegData *jpeg_buf) {
     HI_S32 s32Ret;
 
     VENC_ATTR_JPEG_S jpeg_attr;
@@ -182,6 +182,14 @@ int32_t request_pic(uint32_t width, uint32_t height, struct JpegData *jpeg_buf) 
 
     s32Ret = HI_MPI_VENC_SetChnAttr(jpeg_venc_chn, &venc_chn_attr);
     if (HI_SUCCESS != s32Ret) { printf(tag "HI_MPI_VENC_SetChnAttr(%d, ...) failed with %#x!\n%s\n", jpeg_venc_chn, s32Ret, hi_errstr(s32Ret)); return HI_FAILURE; }
+
+    VENC_PARAM_JPEG_S venc_jpeg_param;
+    memset(&venc_jpeg_param, 0, sizeof(VENC_PARAM_JPEG_S));
+    s32Ret = HI_MPI_VENC_GetJpegParam(jpeg_venc_chn, &venc_jpeg_param);
+    if (HI_SUCCESS != s32Ret) { printf(tag "HI_MPI_VENC_SetJpegParam(%d, ...) failed with %#x!\n%s\n", jpeg_venc_chn, s32Ret, hi_errstr(s32Ret)); return HI_FAILURE; }
+    venc_jpeg_param.u32Qfactor = qfactor;
+    s32Ret = HI_MPI_VENC_SetJpegParam(jpeg_venc_chn, &venc_jpeg_param);
+    if (HI_SUCCESS != s32Ret) { printf(tag "HI_MPI_VENC_SetJpegParam(%d, ...) failed with %#x!\n%s\n", jpeg_venc_chn, s32Ret, hi_errstr(s32Ret)); return HI_FAILURE; }
 
 //    VENC_COLOR2GREY_S pstChnColor2Grey;
 //    pstChnColor2Grey.bColor2Grey = night_mode_enable();
@@ -205,11 +213,11 @@ int32_t request_pic(uint32_t width, uint32_t height, struct JpegData *jpeg_buf) 
     return stream_err;
 }
 
-int32_t get_jpeg(uint32_t width, uint32_t height, struct JpegData *jpeg_buf) {
+int32_t get_jpeg(uint32_t width, uint32_t height, uint32_t qfactor, struct JpegData *jpeg_buf) {
     pthread_mutex_lock(&jpeg_mutex);
     if (!jpeg_enable) { pthread_mutex_unlock(&jpeg_mutex); return HI_FAILURE; }
     // printf(tag "get_next_free_channel %d\n", venc_chn);
-    HI_S32 s32Ret = request_pic(width, height, jpeg_buf);
+    HI_S32 s32Ret = request_pic(width, height, qfactor, jpeg_buf);
     if (s32Ret != HI_SUCCESS) { printf(tag "Can't request_pic!\n"); }
     // printf(tag "disable_channel %d\n", venc_chn);
     pthread_mutex_unlock(&jpeg_mutex);

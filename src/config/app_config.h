@@ -16,10 +16,9 @@ struct AppConfig {
 
     // [jpeg]
     bool jpeg_enable;
-    uint32_t jpeg_fps;
     uint32_t jpeg_width;
     uint32_t jpeg_height;
-    uint32_t jpeg_bitrate;
+    uint32_t jpeg_qfactor;
 
     // [mjpeg]
     bool mjpeg_enable;
@@ -36,9 +35,8 @@ struct AppConfig {
     char http_post_password[128];
     uint32_t http_post_width;
     uint32_t http_post_height;
+    uint32_t http_post_qfactor;
     uint32_t http_post_interval;
-
-    uint32_t http_post_chn;
 
     bool osd_enable;
     bool motion_detect_enable;
@@ -60,6 +58,8 @@ struct AppConfig {
     uint32_t ir_cut_enable_pin;
     uint32_t ir_cut_disable_pin;
     uint32_t ir_sensor_pin;
+    uint32_t sensor_check_interval_s;
+    uint32_t pin_impulse_delay_us;
 };
 
 extern struct AppConfig app_config;
