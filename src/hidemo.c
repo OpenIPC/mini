@@ -289,8 +289,50 @@ HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst) {
     dest_chn.s32ChnId = venc_chn;
     s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return HI_FAILURE; }
+    return HI_SUCCESS;
+}
 
+HI_S32 bind_vpss_venc(VENC_CHN venc_chn) {
+    VPSS_GRP vpss_grp = venc_chn / VPSS_MAX_CHN_NUM;
+    VPSS_CHN vpss_chn = venc_chn - vpss_grp * VPSS_MAX_CHN_NUM;
 
+    HI_S32 s32Ret = HI_MPI_VPSS_EnableChn(vpss_grp, vpss_chn);
+    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_EnableChn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+
+    MPP_CHN_S src_chn;
+    memset(&src_chn, 0, sizeof(MPP_CHN_S));
+    src_chn.enModId = HI_ID_VPSS;
+    src_chn.s32DevId = vpss_grp;
+    src_chn.s32ChnId = vpss_chn;
+    MPP_CHN_S dest_chn;
+    memset(&dest_chn, 0, sizeof(MPP_CHN_S));
+    dest_chn.enModId = HI_ID_VENC;
+    dest_chn.s32DevId = 0;
+    dest_chn.s32ChnId = venc_chn;
+    s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
+    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_Bind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return HI_FAILURE; }
+    return HI_SUCCESS;
+}
+
+HI_S32 unbind_vpss_venc(VENC_CHN venc_chn) {
+    VPSS_GRP vpss_grp = venc_chn / VPSS_MAX_CHN_NUM;
+    VPSS_CHN vpss_chn = venc_chn - vpss_grp * VPSS_MAX_CHN_NUM;
+
+    HI_S32 s32Ret = HI_MPI_VPSS_DisableChn(vpss_grp, vpss_chn);
+    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VPSS_DisableChn failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
+
+    MPP_CHN_S src_chn;
+    memset(&src_chn, 0, sizeof(MPP_CHN_S));
+    src_chn.enModId = HI_ID_VPSS;
+    src_chn.s32DevId = vpss_grp;
+    src_chn.s32ChnId = vpss_chn;
+    MPP_CHN_S dest_chn;
+    memset(&dest_chn, 0, sizeof(MPP_CHN_S));
+    dest_chn.enModId = HI_ID_VENC;
+    dest_chn.s32DevId = 0;
+    dest_chn.s32ChnId = venc_chn;
+    s32Ret = HI_MPI_SYS_UnBind(&src_chn, &dest_chn);
+    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_SYS_UnBind failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return HI_FAILURE; }
     return HI_SUCCESS;
 }
 
@@ -365,15 +407,16 @@ int start_sdk() {
     HI_MPI_SYS_Exit();
     HI_MPI_VB_Exit();
 
+    int u32AlignWidth = app_config.align_width;
+    printf("u32AlignWidth: %d\n", app_config.align_width);
+
     VB_CONF_S vb_conf;
     memset(&vb_conf, 0, sizeof(VB_CONF_S));
     vb_conf.u32MaxPoolCnt = app_config.max_pool_cnt;
-
-    int u32AlignWidth = app_config.align_width;
-
     int u32BlkSize = SYS_CalcPicVbBlkSize(width, height, sensor_config.vichn.pix_format, u32AlignWidth);
     vb_conf.astCommPool[0].u32BlkSize = u32BlkSize;
     vb_conf.astCommPool[0].u32BlkCnt = app_config.blk_cnt; // HI3516C = 10;  HI3516E = 4;
+    printf("vb_conf: u32MaxPoolCnt %d    [0]u32BlkSize %d   [0]u32BlkCnt %d\n", vb_conf.u32MaxPoolCnt, u32BlkSize, app_config.blk_cnt);
 
     HI_S32 s32Ret = HI_MPI_VB_SetConf(&vb_conf);
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VB_SetConf failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); return EXIT_FAILURE; }
@@ -827,8 +870,8 @@ int stop_sdk() {
     HI_S32 s32Ret;
     pthread_join(gs_VencPid, NULL);
 
-//    s32Ret = DestroyJPEG();
-//    if (HI_SUCCESS != s32Ret) { printf("DestroyJPEG() failed with %#x!\n", s32Ret); return EXIT_FAILURE; }
+    s32Ret = DestroyJPEG();
+    // if (HI_SUCCESS != s32Ret) { printf("DestroyJPEG() failed with %#x!\n", s32Ret); return EXIT_FAILURE; }
 
     for (int i = 0; i < VENC_MAX_CHN_NUM; i++)
         if (channel_is_enable(i)) disable_venc_chn(i);

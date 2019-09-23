@@ -11,108 +11,65 @@
 #include "config/app_config.h"
 #include "hidemo.h"
 
+#include "gpio.h"
+
 #define tag "[night]: "
 
-// bool night_mode_state = false;
-//
-//bool night_mode_enable() {
-//    return false;
-//    return night_mode_state;
-//}
+static bool night_mode = false;
 
-void export_pin(uint32_t pin, bool in) {
-    char str_buf[64];
-    {
-        size_t len = sprintf(str_buf, "%d", pin);
-        str_buf[len++] = 0;
-        FILE *file = fopen("/sys/class/gpio/export", "w");
-        fwrite(str_buf, len, 1, file);
-        fclose(file);
-    }
-    {
-        size_t len = sprintf(str_buf, "/sys/class/gpio/gpio%d/direction", pin);
-        str_buf[len++] = 0;
-        FILE *file = fopen(str_buf, "w");
-        if (in)
-            fwrite("in", 2, 1, file);
-        else
-            fwrite("out", 3, 1, file);
-        fclose(file);
-    }
+bool night_mode_is_enable() {
+    return night_mode;
 }
 
-void impulse_pin(uint32_t pin) {
-    printf("impulse_pin on %d\n", pin);
-    static char str_buf[64];
-    {
-        size_t len = sprintf(str_buf, "/sys/class/gpio/gpio%d/value", pin);
-        str_buf[len++] = 0;
-    }
-    FILE *file = fopen(str_buf, "w");
-    fwrite("1", 1, 1, file);
-    fflush(file);
-    usleep(app_config.pin_impulse_delay_us);
-    fwrite("0", 1, 1, file);
-    fflush(file);
-    fclose(file);
+void ircut_on() {
+    set_pin_linux(app_config.ir_cut_pin1, false);
+    set_pin_linux(app_config.ir_cut_pin2, true);
+    usleep(app_config.pin_switch_delay_us);
+    set_pin_linux(app_config.ir_cut_pin1, false);
+    set_pin_linux(app_config.ir_cut_pin2, false);
+    set_color2gray(true);
 }
 
-bool get_pin_value(uint32_t pin) {
-    static char str_buf[64];
-    {
-        size_t len = sprintf(str_buf, "/sys/class/gpio/gpio%d/value", pin);
-        str_buf[len++] = 0;
-    }
-    char *v = "0"; {
-        FILE *file = fopen(str_buf, "r");
-        fread(v, 1, 1, file);
-        fclose(file);
-    }
-    return v[0] == "1"[0];
-}
-
-void ir_cut_disable() {
-    impulse_pin(app_config.ir_cut_disable_pin);
-}
-void ir_cut_enable() {
-    impulse_pin(app_config.ir_cut_enable_pin);
+void ircut_off() {
+    set_pin_linux(app_config.ir_cut_pin1, true);
+    set_pin_linux(app_config.ir_cut_pin2, false);
+    usleep(app_config.pin_switch_delay_us);
+    set_pin_linux(app_config.ir_cut_pin1, false);
+    set_pin_linux(app_config.ir_cut_pin2, false);
+    set_color2gray(false);
 }
 
 void set_night_mode(bool night) {
     if (night) {
         printf("Change mode to NIGHT\n");
-    } else {
-        printf("Change mode to DAY\n");
-    }
-
-    if (night) {
-        ir_cut_disable();
+        ircut_off();
         set_color2gray(true);
     } else {
-        ir_cut_enable();
+        printf("Change mode to DAY\n");
+        ircut_on();
         set_color2gray(false);
     }
 }
 
 extern bool keepRunning;
 
-static night_mode = true;
-
 void* night_thread_func(void *vargp)  {
-    export_pin(app_config.ir_sensor_pin, true);
-    export_pin(app_config.ir_cut_enable_pin, false);
-    export_pin(app_config.ir_cut_disable_pin, false);
-
+    usleep(1000);
     set_night_mode(night_mode);
 
     while (keepRunning) {
-        // bool current_night_mode = !night_mode;
-        bool current_night_mode = get_pin_value(app_config.ir_sensor_pin);
-        if (current_night_mode != night_mode) {
-            set_night_mode(current_night_mode);
-            night_mode = current_night_mode;
+        bool state = false;
+        if(!get_pin_linux(app_config.ir_sensor_pin, &state)) {
+            printf(tag "get_pin_linux(app_config.ir_sensor_pin) error\n");
+            sleep(app_config.check_interval_s);
+            continue;
         }
-        sleep(app_config.sensor_check_interval_s);
+        // printf(tag "get_pin_linux(app_config.ir_sensor_pin) %d\n", state);
+        if (night_mode != state) {
+            night_mode = state;
+            set_night_mode(night_mode);
+        }
+        sleep(app_config.check_interval_s);
     }
 }
 

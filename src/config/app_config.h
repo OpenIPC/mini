@@ -55,11 +55,11 @@ struct AppConfig {
 
     // [night_mode]
     bool night_mode_enable;
-    uint32_t ir_cut_enable_pin;
-    uint32_t ir_cut_disable_pin;
+    uint32_t ir_cut_pin1;
+    uint32_t ir_cut_pin2;
     uint32_t ir_sensor_pin;
-    uint32_t sensor_check_interval_s;
-    uint32_t pin_impulse_delay_us;
+    uint32_t check_interval_s;
+    uint32_t pin_switch_delay_us;
 };
 
 extern struct AppConfig app_config;

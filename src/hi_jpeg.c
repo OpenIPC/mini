@@ -33,7 +33,7 @@
 #define MAX_HEIGHT 1080
 
 VENC_CHN jpeg_venc_chn;
-bool jpeg_enable = false;
+bool jpeg_module_init = false;
 
 pthread_mutex_t jpeg_mutex;
 
@@ -71,8 +71,10 @@ int32_t InitJPEG() {
         return HI_FAILURE;
     }
 
-    jpeg_enable = true;
+    jpeg_module_init = true;
+    unbind_vpss_venc(jpeg_venc_chn);
     pthread_mutex_unlock(&jpeg_mutex);
+    printf(tag "module init ok\n");
 
     return HI_SUCCESS;
 }
@@ -81,7 +83,7 @@ int32_t InitJPEG() {
 int32_t DestroyJPEG() {
     pthread_mutex_lock(&jpeg_mutex);
     disable_venc_chn(jpeg_venc_chn);
-    jpeg_enable = false;
+    jpeg_module_init = false;
     pthread_mutex_unlock(&jpeg_mutex);
 //    HI_S32 s32Ret;
 //
@@ -130,7 +132,7 @@ HI_S32 get_stream(int fd, int venc_chn, struct JpegData *jpeg_buf) {
         stStream.pstPack = (VENC_PACK_S*)malloc(sizeof(VENC_PACK_S) * stStat.u32CurPacks);
         if (NULL == stStream.pstPack) { printf(tag "malloc stream chn[%d] pack failed!\n", venc_chn); return HI_FAILURE; }
         stStream.u32PackCount = stStat.u32CurPacks;
-        s32Ret = HI_MPI_VENC_GetStream(venc_chn, &stStream, HI_TRUE);
+        s32Ret = HI_MPI_VENC_GetStream(venc_chn, &stStream, -1);
         if (HI_SUCCESS != s32Ret) { printf(tag "HI_MPI_VENC_GetStream(%d, ...) failed with %#x!\n%s\n", venc_chn, s32Ret, hi_errstr(s32Ret)); free(stStream.pstPack); stStream.pstPack = NULL; return HI_FAILURE; }
         // printf(tag "HI_MPI_VENC_GetStream ok\n");
         {
@@ -164,6 +166,7 @@ HI_S32 get_stream(int fd, int venc_chn, struct JpegData *jpeg_buf) {
 
 int32_t request_pic(uint32_t width, uint32_t height, uint32_t qfactor, struct JpegData *jpeg_buf) {
     HI_S32 s32Ret;
+    bind_vpss_venc(jpeg_venc_chn);
 
     VENC_ATTR_JPEG_S jpeg_attr;
     memset(&jpeg_attr, 0, sizeof(VENC_ATTR_JPEG_S));
@@ -191,12 +194,12 @@ int32_t request_pic(uint32_t width, uint32_t height, uint32_t qfactor, struct Jp
     s32Ret = HI_MPI_VENC_SetJpegParam(jpeg_venc_chn, &venc_jpeg_param);
     if (HI_SUCCESS != s32Ret) { printf(tag "HI_MPI_VENC_SetJpegParam(%d, ...) failed with %#x!\n%s\n", jpeg_venc_chn, s32Ret, hi_errstr(s32Ret)); return HI_FAILURE; }
 
-//    VENC_COLOR2GREY_S pstChnColor2Grey;
-//    pstChnColor2Grey.bColor2Grey = night_mode_enable();
-//    s32Ret = HI_MPI_VENC_SetColor2Grey(jpeg_venc_chn, &pstChnColor2Grey);
-//    if (HI_SUCCESS != s32Ret) {
-//        printf(tag "HI_MPI_VENC_CreateChn(%d) failed with %#x!\n%s\n", jpeg_venc_chn, s32Ret, hi_errstr(s32Ret));
-//    }
+    VENC_COLOR2GREY_S pstChnColor2Grey;
+    pstChnColor2Grey.bColor2Grey = night_mode_is_enable();
+    s32Ret = HI_MPI_VENC_SetColor2Grey(jpeg_venc_chn, &pstChnColor2Grey);
+    if (HI_SUCCESS != s32Ret) {
+        printf(tag "HI_MPI_VENC_CreateChn(%d) failed with %#x!\n%s\n", jpeg_venc_chn, s32Ret, hi_errstr(s32Ret));
+    }
 
     VENC_RECV_PIC_PARAM_S pstRecvParam;
     pstRecvParam.s32RecvPicNum = 1;
@@ -208,14 +211,19 @@ int32_t request_pic(uint32_t width, uint32_t height, uint32_t qfactor, struct Jp
     if (HI_MPI_VENC_CloseFd(jpeg_venc_chn) != HI_SUCCESS) { printf(tag "HI_MPI_VENC_CloseFd(%d) fail\n", jpeg_venc_chn); };
 
     s32Ret = HI_MPI_VENC_StopRecvPic(jpeg_venc_chn);
-    // if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_StopRecvPic(%d) failed with %#x!\n%s\n", venc_chn, s32Ret, hi_errstr(s32Ret)); /* return EXIT_FAILURE; */ }
+    if (HI_SUCCESS != s32Ret) { printf("HI_MPI_VENC_StopRecvPic(%d) failed with %#x!\n%s\n", jpeg_venc_chn, s32Ret, hi_errstr(s32Ret)); /* return EXIT_FAILURE; */ }
 
+    unbind_vpss_venc(jpeg_venc_chn);
     return stream_err;
 }
 
 int32_t get_jpeg(uint32_t width, uint32_t height, uint32_t qfactor, struct JpegData *jpeg_buf) {
     pthread_mutex_lock(&jpeg_mutex);
-    if (!jpeg_enable) { pthread_mutex_unlock(&jpeg_mutex); return HI_FAILURE; }
+    if (!jpeg_module_init) {
+        pthread_mutex_unlock(&jpeg_mutex);
+        printf(tag "module is not enable\n");
+        return HI_FAILURE;
+    }
     // printf(tag "get_next_free_channel %d\n", venc_chn);
     HI_S32 s32Ret = request_pic(width, height, qfactor, jpeg_buf);
     if (s32Ret != HI_SUCCESS) { printf(tag "Can't request_pic!\n"); }

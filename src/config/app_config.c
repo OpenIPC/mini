@@ -38,10 +38,10 @@ enum ConfigError parse_app_config(const char *path) {
 
     app_config.night_mode_enable = false;
     app_config.ir_sensor_pin = 999;
-    app_config.ir_cut_enable_pin = 999;
-    app_config.ir_cut_disable_pin = 999;
-    app_config.pin_impulse_delay_us = 250;
-    app_config.sensor_check_interval_s = 10;
+    app_config.ir_cut_pin1 = 999;
+    app_config.ir_cut_pin2 = 999;
+    app_config.pin_switch_delay_us = 250;
+    app_config.check_interval_s = 10;
 
     struct IniConfig ini;
     memset(&ini, 0, sizeof(struct IniConfig));
@@ -83,10 +83,10 @@ enum ConfigError parse_app_config(const char *path) {
     if (app_config.night_mode_enable) {
         #define PIN_MAX 95
         err = parse_int(&ini, "night_mode", "ir_sensor_pin", 0, PIN_MAX, &app_config.ir_sensor_pin); if(err != CONFIG_OK) goto RET_ERR;
-        err = parse_int(&ini, "night_mode", "check_interval_s", 0, 600, &app_config.sensor_check_interval_s); if(err != CONFIG_OK) goto RET_ERR;
-        err = parse_int(&ini, "night_mode", "ir_cut_enable_pin", 0, PIN_MAX, &app_config.ir_cut_enable_pin); if(err != CONFIG_OK) goto RET_ERR;
-        err = parse_int(&ini, "night_mode", "ir_cut_disable_pin", 0, PIN_MAX, &app_config.ir_cut_disable_pin); if(err != CONFIG_OK) goto RET_ERR;
-        err = parse_int(&ini, "night_mode", "pin_impulse_delay_us", 0, 1000, &app_config.pin_impulse_delay_us); if(err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "night_mode", "check_interval_s", 0, 600, &app_config.check_interval_s); if(err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "night_mode", "ir_cut_pin1", 0, PIN_MAX, &app_config.ir_cut_pin1); if(err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "night_mode", "ir_cut_pin2", 0, PIN_MAX, &app_config.ir_cut_pin2); if(err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "night_mode", "pin_switch_delay_us", 0, 1000, &app_config.pin_switch_delay_us); if(err != CONFIG_OK) goto RET_ERR;
     }
 
     {

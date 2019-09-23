@@ -54,6 +54,9 @@ void free_client(int i) {
     client_fds[i].socket_fd = -1;
 }
 
+#ifdef  __APPLE__
+#define MSG_NOSIGNAL SO_NOSIGPIPE
+#endif
 int send_to_fd(int client_fd, char* buf, ssize_t size) {
     ssize_t sent = 0, len = 0;
     if (client_fd < 0) return -1;
@@ -65,11 +68,17 @@ int send_to_fd(int client_fd, char* buf, ssize_t size) {
     return 0;
 }
 
+
+int send_to_fd_nonblock(int client_fd, char* buf, ssize_t size) {
+    if (client_fd < 0) return -1;
+    send(client_fd, buf, size, MSG_DONTWAIT | MSG_NOSIGNAL);
+    return 0;
+}
+
 int send_to_client(int i, char* buf, ssize_t size) {;
     if (send_to_fd(client_fds[i].socket_fd, buf, size) < 0) { free_client(i); return -1; }
     return 0;
 }
-
 
 void send_h264_to_client(uint8_t chn_index, const void *p) {
     const VENC_STREAM_S *stream = (const VENC_STREAM_S *)p;
@@ -235,8 +244,16 @@ void send_jpeg(uint8_t chn_index, char *buf, ssize_t size) {
 void* send_jpeg_thread(void *vargp) {
     int client_fd = *((int *) vargp);
     struct JpegData jpeg = {0};
-    HI_S32 s32Ret = get_jpeg(app_config.jpeg_width, app_config.jpeg_height, &jpeg);
-    if (s32Ret != HI_SUCCESS) return NULL;
+    printf("try to request jpeg from hisdk...\n");
+    HI_S32 s32Ret = get_jpeg(app_config.jpeg_width, app_config.jpeg_height, app_config.jpeg_qfactor, &jpeg);
+    if (s32Ret != HI_SUCCESS) {
+        printf("can't get jpeg from hisdk...\n");
+        static char response[] = "HTTP/1.1 503 Internal Error\r\nContent-Length: 11\r\nConnection: close\r\n\r\nHello, 503!";
+        send_to_fd(client_fd, response, sizeof(response) - 1); // zero ending string!
+        close_socket_fd(client_fd);
+        return NULL;
+    }
+    printf("request jpeg from hisdk is ok\n");
     char buf[1024];
     int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: %lu\r\nConnection: close\r\n\r\n", jpeg.jpeg_size);
     send_to_fd(client_fd, buf, buf_len);
@@ -244,6 +261,7 @@ void* send_jpeg_thread(void *vargp) {
     send_to_fd(client_fd, "\r\n", 2);
     close_socket_fd(client_fd);
     free(jpeg.buf);
+    printf("jpeg was send\n");
     return NULL;
 }
 

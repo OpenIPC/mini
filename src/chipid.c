@@ -112,7 +112,7 @@ void isp_version() {
             printf("unknown %d", build);
     }
 
-    printf("    sequence number: %d\n", build);
+    printf("    sequence number: %d\n", sn);
 }
 
 

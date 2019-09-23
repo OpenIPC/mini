@@ -66,6 +66,8 @@ add_executable(minihttp
     src/motion_detect.c
     src/night.h
     src/night.c
+    src/gpio.h
+    src/gpio.c
     src/http_post.h
     src/http_post.c
     src/hi_jpeg.h

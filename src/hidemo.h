@@ -39,5 +39,8 @@ void set_channel_disable(uint32_t channel);
 //HI_S32 disable_venc_chn(VENC_CHN venc_chn, VPSS_GRP vpss_grp, VENC_CHN vpss_chn);
 
 
+HI_S32 bind_vpss_venc(VENC_CHN venc_chn);
+HI_S32 unbind_vpss_venc(VENC_CHN venc_chn);
+
 HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst);
 HI_S32 disable_venc_chn(VENC_CHN venc_chn);
