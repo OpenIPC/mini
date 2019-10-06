@@ -361,7 +361,7 @@ void *server_thread(void *vargp) {
     int server_fd = *((int *) vargp);
     int enable = 1;
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-        printf("setsockopt(SO_REUSEADDR) failed"); fflush(stdout);
+        printf("Web server error: setsockopt(SO_REUSEADDR) failed"); fflush(stdout);
     }
     // int set = 1;
     // setsockopt(server_fd, SOL_SOCKET, SO_NOSIGPIPE, (void *)&set, sizeof(int));
@@ -371,7 +371,7 @@ void *server_thread(void *vargp) {
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     int res = bind(server_fd, (struct sockaddr*) &server, sizeof(server));
     if (res != 0) {
-        printf("Error: %s (%d)\n", strerror(errno), errno);
+        printf("Web server error: %s (%d)\n", strerror(errno), errno);
         keepRunning = false;
         close_socket_fd(server_fd);
         return NULL;

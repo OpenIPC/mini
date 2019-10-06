@@ -104,8 +104,8 @@ enum ConfigError parse_config_videv(struct IniConfig *ini, const char *section, 
     {
         const char* possible_values[] = { "VI_INPUT_DATA_VUVU", "VI_INPUT_DATA_UVUV" };
         const int count = sizeof(possible_values) / sizeof(const char *);
-        err = parse_enum(ini, section, "Data_seq", (void *)&videv->data_seq,  possible_values, count, 0); if(err != CONFIG_OK) return err;
-        {
+        err = parse_enum(ini, section, "Data_seq", (void *)&videv->data_seq,  possible_values, count, 0);
+        if (err != CONFIG_OK) {
             const char* possible_values[] = { "VI_INPUT_DATA_UYVY", "VI_INPUT_DATA_VYUY", "VI_INPUT_DATA_YUYV", "VI_INPUT_DATA_YVYU" };
             const int count = sizeof(possible_values) / sizeof(const char *);
             err = parse_enum(ini, section, "Data_seq", (void *)&videv->data_seq,  possible_values, count, 0); if(err != CONFIG_OK) return err;
