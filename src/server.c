@@ -241,25 +241,33 @@ void send_jpeg(uint8_t chn_index, char *buf, ssize_t size) {
     pthread_mutex_unlock(&client_fds_mutex);
 }
 
+
+struct JpegTask {
+    int client_fd;
+    uint16_t width;
+    uint16_t height;
+    uint8_t qfactor;
+};
 void* send_jpeg_thread(void *vargp) {
-    int client_fd = *((int *) vargp);
+    // int client_fd = *((int *) vargp);
+    struct JpegTask task = *((struct JpegTask *) vargp);
     struct JpegData jpeg = {0};
-    printf("try to request jpeg from hisdk...\n");
-    HI_S32 s32Ret = get_jpeg(app_config.jpeg_width, app_config.jpeg_height, app_config.jpeg_qfactor, &jpeg);
+    printf("try to request jpeg (%ux%u, qfactor %u) from hisdk...\n", task.width, task.height, task.qfactor);
+    HI_S32 s32Ret = get_jpeg(task.width, task.height, task.qfactor, &jpeg);
     if (s32Ret != HI_SUCCESS) {
         printf("can't get jpeg from hisdk...\n");
         static char response[] = "HTTP/1.1 503 Internal Error\r\nContent-Length: 11\r\nConnection: close\r\n\r\nHello, 503!";
-        send_to_fd(client_fd, response, sizeof(response) - 1); // zero ending string!
-        close_socket_fd(client_fd);
+        send_to_fd(task.client_fd, response, sizeof(response) - 1); // zero ending string!
+        close_socket_fd(task.client_fd);
         return NULL;
     }
     printf("request jpeg from hisdk is ok\n");
     char buf[1024];
     int buf_len = sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: %lu\r\nConnection: close\r\n\r\n", jpeg.jpeg_size);
-    send_to_fd(client_fd, buf, buf_len);
-    send_to_fd(client_fd, jpeg.buf, jpeg.jpeg_size);
-    send_to_fd(client_fd, "\r\n", 2);
-    close_socket_fd(client_fd);
+    send_to_fd(task.client_fd, buf, buf_len);
+    send_to_fd(task.client_fd, jpeg.buf, jpeg.jpeg_size);
+    send_to_fd(task.client_fd, "\r\n", 2);
+    close_socket_fd(task.client_fd);
     free(jpeg.buf);
     printf("jpeg was send\n");
     return NULL;
@@ -445,8 +453,18 @@ void *server_thread(void *vargp) {
 //            continue;
 //        }
 
-        if (strcmp(request_path, "./image.jpg") == 0 && app_config.jpeg_enable) {
+        if (startsWith(request_path, "./image.jpg") && app_config.jpeg_enable) {
             {
+                struct JpegTask task;
+                task.client_fd = client_fd;
+                task.width = app_config.jpeg_width;
+                task.height = app_config.jpeg_height;
+                task.qfactor = app_config.jpeg_qfactor;
+
+                get_uint16(request_path, "width=", &task.width);
+                get_uint16(request_path, "height=", &task.height);
+                get_uint8(request_path, "qfactor=", &task.qfactor);
+
                 pthread_t thread_id;
                 pthread_attr_t thread_attr;
                 pthread_attr_init(&thread_attr);
@@ -454,7 +472,7 @@ void *server_thread(void *vargp) {
                 pthread_attr_getstacksize(&thread_attr,&stacksize);
                 size_t new_stacksize = 16*1024;
                 if (pthread_attr_setstacksize(&thread_attr, new_stacksize)) { printf("Error:  Can't set stack size %ld\n", new_stacksize); }
-                pthread_create(&thread_id, &thread_attr, send_jpeg_thread, (void *) &client_fd);
+                pthread_create(&thread_id, &thread_attr, send_jpeg_thread, (void *) &task);
                 if (pthread_attr_setstacksize(&thread_attr, stacksize)) { printf("Error:  Can't set stack size %ld\n", stacksize); }
                 pthread_attr_destroy(&thread_attr);
             }
