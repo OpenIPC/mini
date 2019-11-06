@@ -164,7 +164,7 @@ HI_S32 get_stream(int fd, int venc_chn, struct JpegData *jpeg_buf) {
 }
 
 
-int32_t request_pic(uint32_t width, uint32_t height, uint32_t qfactor, struct JpegData *jpeg_buf) {
+int32_t request_pic(uint32_t width, uint32_t height, uint32_t qfactor, uint8_t color2Grey, struct JpegData *jpeg_buf) {
     HI_S32 s32Ret;
     bind_vpss_venc(jpeg_venc_chn);
 
@@ -195,7 +195,11 @@ int32_t request_pic(uint32_t width, uint32_t height, uint32_t qfactor, struct Jp
     if (HI_SUCCESS != s32Ret) { printf(tag "HI_MPI_VENC_SetJpegParam(%d, ...) failed with %#x!\n%s\n", jpeg_venc_chn, s32Ret, hi_errstr(s32Ret)); return HI_FAILURE; }
 
     VENC_COLOR2GREY_S pstChnColor2Grey;
-    pstChnColor2Grey.bColor2Grey = night_mode_is_enable();
+    if(color2Grey == 0) {
+        pstChnColor2Grey.bColor2Grey = false;
+    } else if(color2Grey == 1) {
+        pstChnColor2Grey.bColor2Grey = true;
+    } else pstChnColor2Grey.bColor2Grey = night_mode_is_enable();
     s32Ret = HI_MPI_VENC_SetColor2Grey(jpeg_venc_chn, &pstChnColor2Grey);
     if (HI_SUCCESS != s32Ret) {
         printf(tag "HI_MPI_VENC_CreateChn(%d) failed with %#x!\n%s\n", jpeg_venc_chn, s32Ret, hi_errstr(s32Ret));
@@ -217,7 +221,7 @@ int32_t request_pic(uint32_t width, uint32_t height, uint32_t qfactor, struct Jp
     return stream_err;
 }
 
-int32_t get_jpeg(uint32_t width, uint32_t height, uint32_t qfactor, struct JpegData *jpeg_buf) {
+int32_t get_jpeg(uint32_t width, uint32_t height, uint32_t qfactor, uint8_t color2gray, struct JpegData *jpeg_buf) {
     pthread_mutex_lock(&jpeg_mutex);
     if (!jpeg_module_init) {
         pthread_mutex_unlock(&jpeg_mutex);
@@ -225,7 +229,7 @@ int32_t get_jpeg(uint32_t width, uint32_t height, uint32_t qfactor, struct JpegD
         return HI_FAILURE;
     }
     // printf(tag "get_next_free_channel %d\n", venc_chn);
-    HI_S32 s32Ret = request_pic(width, height, qfactor, jpeg_buf);
+    HI_S32 s32Ret = request_pic(width, height, qfactor, color2gray, jpeg_buf);
     if (s32Ret != HI_SUCCESS) { printf(tag "Can't request_pic!\n"); }
     // printf(tag "disable_channel %d\n", venc_chn);
     pthread_mutex_unlock(&jpeg_mutex);

@@ -233,7 +233,7 @@ void* send_thread(void *vargp)  {
         if (current_time - last_time < app_config.http_post_interval) { sleep(1); continue; }
 
         // printf(tag "start get_jpeg\n");
-        HI_S32 s32Ret = get_jpeg(app_config.http_post_width, app_config.http_post_height, app_config.http_post_qfactor, &jpeg);
+        HI_S32 s32Ret = get_jpeg(app_config.http_post_width, app_config.http_post_height, app_config.http_post_qfactor, 3, &jpeg);
         if (s32Ret != HI_SUCCESS) { printf(tag "get_jpeg error!\n"); continue; }
         last_time = current_time;
 

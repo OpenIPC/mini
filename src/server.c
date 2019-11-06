@@ -247,13 +247,14 @@ struct JpegTask {
     uint16_t width;
     uint16_t height;
     uint8_t qfactor;
+    uint8_t color2Gray;
 };
 void* send_jpeg_thread(void *vargp) {
     // int client_fd = *((int *) vargp);
     struct JpegTask task = *((struct JpegTask *) vargp);
     struct JpegData jpeg = {0};
-    printf("try to request jpeg (%ux%u, qfactor %u) from hisdk...\n", task.width, task.height, task.qfactor);
-    HI_S32 s32Ret = get_jpeg(task.width, task.height, task.qfactor, &jpeg);
+    printf("try to request jpeg (%ux%u, qfactor %u, color2Gray %d) from hisdk...\n", task.width, task.height, task.qfactor, task.color2Gray);
+    HI_S32 s32Ret = get_jpeg(task.width, task.height, task.qfactor, task.color2Gray, &jpeg);
     if (s32Ret != HI_SUCCESS) {
         printf("can't get jpeg from hisdk...\n");
         static char response[] = "HTTP/1.1 503 Internal Error\r\nContent-Length: 11\r\nConnection: close\r\n\r\nHello, 503!";
@@ -460,10 +461,12 @@ void *server_thread(void *vargp) {
                 task.width = app_config.jpeg_width;
                 task.height = app_config.jpeg_height;
                 task.qfactor = app_config.jpeg_qfactor;
+                task.color2Gray = 3;
 
                 get_uint16(request_path, "width=", &task.width);
                 get_uint16(request_path, "height=", &task.height);
                 get_uint8(request_path, "qfactor=", &task.qfactor);
+                get_uint8(request_path, "color2gray=", &task.color2Gray);
 
                 pthread_t thread_id;
                 pthread_attr_t thread_attr;
