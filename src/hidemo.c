@@ -34,19 +34,11 @@
 #include "sensor.h"
 #include "server.h"
 
-#if HISILICON_SDK_GEN <= 2
-#define MPEG_ATTR stAttrMjpeg
-#elif HISILICON_SDK_GEN == 3
-#define MPEG_ATTR stAttrMjpege
-#endif
-
-#define MIPI_DEV "/dev/hi_mipi"
-
 struct SDKState state;
 
 HI_S32 HI_MPI_SYS_GetChipId(HI_U32 *pu32ChipId);
 
-HI_VOID *Test_ISP_Run(HI_VOID *param) {
+HI_VOID *isp_thread(HI_VOID *param) {
     ISP_DEV isp_dev = 0;
     HI_S32 s32Ret = HI_MPI_ISP_Run(isp_dev);
     if (HI_SUCCESS != s32Ret) {
@@ -783,7 +775,7 @@ int start_sdk() {
             printf("Error:  Can't set stack size %zu\n", new_stacksize);
         }
         if (0 != pthread_create(
-                     &gs_IspPid, &thread_attr, (void *(*)(void *))Test_ISP_Run,
+                     &gs_IspPid, &thread_attr, (void *(*)(void *))isp_thread,
                      NULL)) {
             printf("%s: create isp running thread failed!\n", __FUNCTION__);
             return EXIT_FAILURE;
@@ -796,49 +788,52 @@ int start_sdk() {
     usleep(1000);
 
     state.vi_dev = 0;
-    VI_DEV_ATTR_S vi_dev_attr;
-    memset(&vi_dev_attr, 0, sizeof(VI_DEV_ATTR_S));
-    vi_dev_attr.enIntfMode = VI_MODE_DIGITAL_CAMERA;
-    vi_dev_attr.enWorkMode = sensor_config.videv.work_mod;
-    vi_dev_attr.au32CompMask[0] = sensor_config.videv.mask_0;
-    vi_dev_attr.au32CompMask[1] = sensor_config.videv.mask_1;
-    vi_dev_attr.enScanMode = sensor_config.videv.scan_mode;
-    vi_dev_attr.s32AdChnId[0] = -1;
-    vi_dev_attr.s32AdChnId[1] = -1;
-    vi_dev_attr.s32AdChnId[2] = -1;
-    vi_dev_attr.s32AdChnId[3] = -1;
-    vi_dev_attr.enDataSeq = sensor_config.videv.data_seq;
-    vi_dev_attr.stSynCfg.enVsync = sensor_config.videv.vsync;
-    vi_dev_attr.stSynCfg.enVsyncNeg = sensor_config.videv.vsync_neg;
-    vi_dev_attr.stSynCfg.enHsync = sensor_config.videv.hsync;
-    vi_dev_attr.stSynCfg.enHsyncNeg = sensor_config.videv.hsync_neg;
-    vi_dev_attr.stSynCfg.enVsyncValid = sensor_config.videv.vsync_valid;
-    vi_dev_attr.stSynCfg.enVsyncValidNeg = sensor_config.videv.vsync_valid_neg;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32HsyncHfb =
-        sensor_config.videv.timing_blank_hsync_hfb;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32HsyncAct =
-        sensor_config.videv.timing_blank_hsync_act;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32HsyncHbb =
-        sensor_config.videv.timing_blank_hsync_hbb;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVfb =
-        sensor_config.videv.timing_blank_vsync_vfb;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVact =
-        sensor_config.videv.timing_blank_vsync_vact;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVbb =
-        sensor_config.videv.timing_blank_vsync_vbb;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVbfb =
-        sensor_config.videv.timing_blank_vsync_vbfb;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVbact =
-        sensor_config.videv.timing_blank_vsync_vbact;
-    vi_dev_attr.stSynCfg.stTimingBlank.u32VsyncVbbb =
-        sensor_config.videv.timing_blank_vsync_vbbb;
-    vi_dev_attr.enDataPath = sensor_config.videv.data_path;
-    vi_dev_attr.enInputDataType = sensor_config.videv.input_data_type;
-    vi_dev_attr.bDataRev = sensor_config.videv.data_rev;
-    vi_dev_attr.stDevRect.s32X = sensor_config.videv.dev_rect_x;
-    vi_dev_attr.stDevRect.s32Y = sensor_config.videv.dev_rect_y;
-    vi_dev_attr.stDevRect.u32Width = sensor_config.videv.dev_rect_w;
-    vi_dev_attr.stDevRect.u32Height = sensor_config.videv.dev_rect_h;
+    VI_DEV_ATTR_S vi_dev_attr = {
+        .enIntfMode = sensor_config.videv.input_mod,
+        .enWorkMode = sensor_config.videv.work_mod,
+        .au32CompMask =
+            {sensor_config.videv.mask_0, sensor_config.videv.mask_1},
+        .enScanMode = sensor_config.videv.scan_mode,
+        .s32AdChnId = {-1, -1, -1, -1},
+        .enDataSeq = sensor_config.videv.data_seq,
+        .stSynCfg =
+            {
+                .enVsync = sensor_config.videv.vsync,
+                .enVsyncNeg = sensor_config.videv.vsync_neg,
+                .enHsync = sensor_config.videv.hsync,
+                .enHsyncNeg = sensor_config.videv.hsync_neg,
+                .enVsyncValid = sensor_config.videv.vsync_valid,
+                .enVsyncValidNeg = sensor_config.videv.vsync_valid_neg,
+                .stTimingBlank.u32HsyncHfb =
+                    sensor_config.videv.timing_blank_hsync_hfb,
+                .stTimingBlank.u32HsyncAct =
+                    sensor_config.videv.timing_blank_hsync_act,
+                .stTimingBlank.u32HsyncHbb =
+                    sensor_config.videv.timing_blank_hsync_hbb,
+                .stTimingBlank.u32VsyncVfb =
+                    sensor_config.videv.timing_blank_vsync_vfb,
+                .stTimingBlank.u32VsyncVact =
+                    sensor_config.videv.timing_blank_vsync_vact,
+                .stTimingBlank.u32VsyncVbb =
+                    sensor_config.videv.timing_blank_vsync_vbb,
+                .stTimingBlank.u32VsyncVbfb =
+                    sensor_config.videv.timing_blank_vsync_vbfb,
+                .stTimingBlank.u32VsyncVbact =
+                    sensor_config.videv.timing_blank_vsync_vbact,
+                .stTimingBlank.u32VsyncVbbb =
+                    sensor_config.videv.timing_blank_vsync_vbbb,
+            },
+        .enDataPath = sensor_config.videv.data_path,
+        .enInputDataType = sensor_config.videv.input_data_type,
+        .bDataRev = sensor_config.videv.data_rev,
+        .stDevRect =
+            {
+                .s32X = sensor_config.videv.dev_rect_x,
+                .s32Y = sensor_config.videv.dev_rect_y,
+                .u32Width = sensor_config.videv.dev_rect_w,
+                .u32Height = sensor_config.videv.dev_rect_h,
+            },
+    };
 
     s32Ret = HI_MPI_VI_SetDevAttr(state.vi_dev, &vi_dev_attr);
     if (HI_SUCCESS != s32Ret) {
@@ -848,10 +843,10 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
-    VI_WDR_ATTR_S wdr_addr;
-    memset(&wdr_addr, 0, sizeof(VI_WDR_ATTR_S));
-    wdr_addr.enWDRMode = WDR_MODE_NONE;
-    wdr_addr.bCompress = HI_FALSE;
+    VI_WDR_ATTR_S wdr_addr = {
+        .enWDRMode = WDR_MODE_NONE,
+        .bCompress = HI_FALSE,
+    };
     s32Ret = HI_MPI_VI_SetWDRAttr(state.vi_dev, &wdr_addr);
     if (HI_SUCCESS != s32Ret) {
         printf(

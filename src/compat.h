@@ -51,4 +51,14 @@ typedef BT656_FIXCODE_E VI_BT656_FIXCODE_E;
 typedef BT656_FIELD_POLAR_E VI_BT656_FIELD_POLAR_E;
 #endif
 
+#if HISILICON_SDK_GEN <= 2
+#define MPEG_ATTR stAttrMjpeg
+#define JPEG_ATTR stAttrJpeg
+#elif HISILICON_SDK_GEN == 3
+#define MPEG_ATTR stAttrMjpege
+#define JPEG_ATTR stAttrJpege
+#endif
+
+#define MIPI_DEV "/dev/hi_mipi"
+
 #endif /* COMPAT_H */

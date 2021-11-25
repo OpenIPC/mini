@@ -10,6 +10,7 @@
 
 #include "config/app_config.h"
 #include "hidemo.h"
+#include "compat.h"
 
 #include "gpio.h"
 
@@ -71,6 +72,7 @@ void *night_thread_func(void *vargp) {
 }
 
 int32_t start_monitor_light_sensor() {
+#if HISILICON_SDK_GEN == 2
     pthread_t thread_id = 0;
 
     pthread_attr_t thread_attr;
@@ -86,4 +88,5 @@ int32_t start_monitor_light_sensor() {
         printf(tag "Error:  Can't set stack size %ld\n", stacksize);
     }
     pthread_attr_destroy(&thread_attr);
+#endif
 }

@@ -33,12 +33,6 @@
 #define MAX_WIDTH  1920
 #define MAX_HEIGHT 1080
 
-#if HISILICON_SDK_GEN <= 2
-#define JPEG_ATTR stAttrJpeg
-#elif HISILICON_SDK_GEN == 3
-#define JPEG_ATTR stAttrJpege
-#endif
-
 VENC_CHN jpeg_venc_chn;
 bool jpeg_module_init = false;
 
