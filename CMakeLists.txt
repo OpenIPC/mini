@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.12)
-project(minihttp C)
+project(mini C)
 
 # set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_FLAGS "-std=gnu99")
@@ -19,7 +19,7 @@ set(HILIBS
     dl
 )
 
-add_executable(minihttp
+add_executable(mini
     src/mp4/bitbuf.h
     src/mp4/bitbuf.c
     src/mp4/moov.h
@@ -72,5 +72,5 @@ add_executable(minihttp
     src/hi_jpeg.c
     src/main.c
 )
-target_link_libraries( minihttp pthread ${HILIBS} )
-install(TARGETS minihttp RUNTIME DESTINATION /usr/bin/)
+target_link_libraries( mini pthread ${HILIBS} )
+install(TARGETS mini RUNTIME DESTINATION /usr/bin/)

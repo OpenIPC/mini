@@ -50,13 +50,13 @@ enum ConfigError parse_app_config(const char *path) {
     {
         char config_path[50];
         ssize_t len = sprintf(config_path, "/etc/%s", path);
-        FILE *file = fopen("./minihttp.ini", "rb");
+        FILE *file = fopen("./mini.ini", "rb");
         if (!file) {
-            file = fopen("/etc/minihttp.ini", "rb");
+            file = fopen("/etc/mini.ini", "rb");
             if (!file) {
                 printf(
-                    "Can't find config minihttp.ini in:\n    ./minihttp.ini\n  "
-                    "  /etc/minihttp.ini\n",
+                    "Can't find config mini.ini in:\n    ./mini.ini\n  "
+                    "  /etc/mini.ini\n",
                     path);
                 return -1;
             }

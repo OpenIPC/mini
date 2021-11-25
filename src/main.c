@@ -24,8 +24,8 @@ int main(int argc, char *argv[]) {
     chip_id();
     isp_version();
 
-    if (parse_app_config("./minihttp.ini") != CONFIG_OK) {
-        printf("Can't load app config './minihttp.ini'\n");
+    if (parse_app_config("./mini.ini") != CONFIG_OK) {
+        printf("Can't load app config './mini.ini'\n");
         return EXIT_FAILURE;
     }
 
