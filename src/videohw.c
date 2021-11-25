@@ -1,4 +1,4 @@
-#include "hidemo.h"
+#include "videohw.h"
 
 #include "compat.h"
 
@@ -24,7 +24,7 @@
 
 #include "config/app_config.h"
 #include "config/sensor_config.h"
-#include "hi_jpeg.h"
+#include "jpeg.h"
 #include "hierrors.h"
 #include "http_post.h"
 #include "motion_detect.h"

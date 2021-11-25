@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "hidemo.h"
+#include "videohw.h"
 #include "server.h"
 
 #include "config/app_config.h"

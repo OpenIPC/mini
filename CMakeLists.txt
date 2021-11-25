@@ -44,14 +44,12 @@ add_executable(${PROJECT_NAME}
     src/compat.h
     src/gpio.c
     src/gpio.h
-    src/hidemo.c
-    src/hidemo.h
     src/hierrors.c
     src/hierrors.h
-    src/hi_jpeg.c
-    src/hi_jpeg.h
     src/http_post.c
     src/http_post.h
+    src/jpeg.c
+    src/jpeg.h
     src/main.c
     src/mmap.h
     src/motion_detect.c
@@ -65,6 +63,8 @@ add_executable(${PROJECT_NAME}
     src/stack.c
     src/tools.c
     src/tools.h
+    src/videohw.c
+    src/videohw.h
 )
 
 target_link_libraries(${PROJECT_NAME}

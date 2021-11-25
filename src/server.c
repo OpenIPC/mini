@@ -16,7 +16,7 @@
 
 #include "tools.h"
 
-#include "hi_jpeg.h"
+#include "jpeg.h"
 
 #include "config/app_config.h"
 

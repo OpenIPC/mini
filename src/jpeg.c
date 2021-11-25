@@ -1,4 +1,4 @@
-#include "hi_jpeg.h"
+#include "jpeg.h"
 
 #include <fcntl.h>
 #include <pthread.h>
@@ -23,7 +23,7 @@
 
 #include "compat.h"
 
-#include "hidemo.h"
+#include "videohw.h"
 #include "night.h"
 #include "config/app_config.h"
 #include "hierrors.h"

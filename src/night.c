@@ -9,7 +9,7 @@
 #include <unistd.h>
 
 #include "config/app_config.h"
-#include "hidemo.h"
+#include "videohw.h"
 #include "compat.h"
 
 #include "gpio.h"

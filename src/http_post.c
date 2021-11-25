@@ -25,7 +25,7 @@
 #include "config/app_config.h"
 #include "http_post.h"
 
-#include "hi_jpeg.h"
+#include "jpeg.h"
 
 #define tag "[http_post]: "
 
