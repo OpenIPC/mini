@@ -41,8 +41,6 @@ add_executable(${PROJECT_NAME}
     src/rtsp/rtsputils.c
     src/rtsp/rtsputils.h
 
-    src/chipid.c
-    src/chipid.h
     src/compat.h
     src/gpio.c
     src/gpio.h

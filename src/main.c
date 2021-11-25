@@ -14,16 +14,11 @@
 #include "rtsp/rtputils.h"
 #include "rtsp/rtspservice.h"
 
-#include "chipid.h"
-
 #include "http_post.h"
 
 #include "night.h"
 
 int main(int argc, char *argv[]) {
-    chip_id();
-    isp_version();
-
     if (parse_app_config("./mini.ini") != CONFIG_OK) {
         printf("Can't load app config './mini.ini'\n");
         return EXIT_FAILURE;
