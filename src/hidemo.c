@@ -1,5 +1,7 @@
 #include "hidemo.h"
 
+#include "compat.h"
+
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
@@ -20,20 +22,23 @@
 #include <mpi_vi.h>
 #include <mpi_vpss.h>
 
+#include "config/app_config.h"
 #include "config/sensor_config.h"
+#include "hi_jpeg.h"
 #include "hierrors.h"
-#include "sensor.h"
-#include "server.h"
-
+#include "http_post.h"
+#include "motion_detect.h"
 #include "rtsp/ringfifo.h"
 #include "rtsp/rtputils.h"
 #include "rtsp/rtspservice.h"
+#include "sensor.h"
+#include "server.h"
 
-#include "config/app_config.h"
-
-#include "hi_jpeg.h"
-#include "http_post.h"
-#include "motion_detect.h"
+#if HISILICON_SDK_GEN <= 2
+#define MPEG_ATTR stAttrMjpeg
+#elif HISILICON_SDK_GEN == 3
+#define MPEG_ATTR stAttrMjpege
+#endif
 
 struct SDKState state;
 
@@ -103,6 +108,7 @@ HI_S32 VENC_SaveMJpeg(int chn_index, VENC_STREAM_S *pstStream) {
     }
     return HI_SUCCESS;
 }
+
 HI_S32 VENC_SaveStream(
     int chn_index, PAYLOAD_TYPE_E enType, VENC_STREAM_S *pstStream) {
     HI_S32 s32Ret;
@@ -140,18 +146,21 @@ uint32_t take_next_free_channel(bool in_main_loop) {
     pthread_mutex_unlock(&mutex);
     return -1;
 }
+
 bool channel_is_enable(uint32_t channel) {
     pthread_mutex_lock(&mutex);
     bool enable = VencS[channel].enable;
     pthread_mutex_unlock(&mutex);
     return enable;
 }
+
 bool channel_main_loop(uint32_t channel) {
     pthread_mutex_lock(&mutex);
     bool in_main_loop = VencS[channel].in_main_loop;
     pthread_mutex_unlock(&mutex);
     return in_main_loop;
 }
+
 void set_channel_disable(uint32_t channel) {
     pthread_mutex_lock(&mutex);
     VencS[channel].enable = false;
@@ -585,7 +594,7 @@ int start_sdk() {
     ALG_LIB_S lib;
     memset(&lib, 0, sizeof(ALG_LIB_S));
     lib.s32Id = 0;
-    strcpy(lib.acLibName, "hisi_ae_lib\0        ");
+    strcpy(lib.acLibName, "hisi_ae_lib");
     s32Ret = HI_MPI_AE_Register(state.isp_dev, &lib);
     if (HI_SUCCESS != s32Ret) {
         printf(
@@ -594,7 +603,7 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
     lib.s32Id = 0;
-    strcpy(lib.acLibName, "hisi_awb_lib\0       ");
+    strcpy(lib.acLibName, "hisi_awb_lib");
     s32Ret = HI_MPI_AWB_Register(state.isp_dev, &lib);
     if (HI_SUCCESS != s32Ret) {
         printf(
@@ -603,7 +612,7 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
     lib.s32Id = 0;
-    strcpy(lib.acLibName, "hisi_af_lib\0        ");
+    strcpy(lib.acLibName, "hisi_af_lib");
     s32Ret = HI_MPI_AF_Register(state.isp_dev, &lib);
     if (HI_SUCCESS != s32Ret) {
         printf(
@@ -682,7 +691,7 @@ int start_sdk() {
         pthread_attr_getstacksize(&thread_attr, &stacksize);
         size_t new_stacksize = app_config.isp_thread_stack_size;
         if (pthread_attr_setstacksize(&thread_attr, new_stacksize)) {
-            printf("Error:  Can't set stack size %ld\n", new_stacksize);
+            printf("Error:  Can't set stack size %zu\n", new_stacksize);
         }
         if (0 != pthread_create(
                      &gs_IspPid, &thread_attr, (void *(*)(void *))Test_ISP_Run,
@@ -691,7 +700,7 @@ int start_sdk() {
             return EXIT_FAILURE;
         }
         if (pthread_attr_setstacksize(&thread_attr, stacksize)) {
-            printf("Error:  Can't set stack size %ld\n", stacksize);
+            printf("Error:  Can't set stack size %zu\n", stacksize);
         }
         pthread_attr_destroy(&thread_attr);
     }
@@ -876,36 +885,43 @@ int start_sdk() {
         unsigned int width = app_config.mp4_width;
         unsigned int height = app_config.mp4_height;
 
-        VENC_CHN_ATTR_S venc_chn_attr;
-        memset(&venc_chn_attr, 0, sizeof(VENC_CHN_ATTR_S));
+        VENC_CHN_ATTR_S venc_chn_attr = {
+            .stVeAttr =
+                {
+                    .enType = PT_H264,
+                    .stAttrH264e =
+                        {
+                            .u32MaxPicWidth = width,
+                            .u32MaxPicHeight = height,
+                            .u32PicWidth = width,         /*the picture width*/
+                            .u32PicHeight = height,       /*the picture height*/
+                            .u32BufSize = width * height, /*stream buffer size*/
+                            .u32Profile =
+                                0, /*0: baseline; 1:MP; 2:HP;  3:svc_t */
+                            .bByFrame = HI_TRUE, /*get stream mode is slice mode
+                                                    or frame mode?*/
+#if HISILICON_SDK_GEN <= 2
+                            .u32RefNum =
+                                1, /* 0: default; number of reference frames*/
+#endif
+                        },
+                },
+            .stRcAttr =
+                {
+                    .enRcMode = VENC_RC_MODE_H264CBR,
+                    .stAttrH264Cbr =
+                        {
+                            .u32Gop = app_config.mp4_fps,
+                            .u32StatTime = 1, /* stream rate statics time(s) */
+                            .u32SrcFrmRate =
+                                app_config.mp4_fps, /* input (vi) frame rate */
+                            .fr32DstFrmRate =
+                                app_config.mp4_fps, /* target frame rate */
+                            .u32BitRate = app_config.mp4_bitrate,
+                        },
+                },
+        };
 
-        VENC_ATTR_H264_S h264_attr;
-        memset(&h264_attr, 0, sizeof(VENC_ATTR_H264_S));
-        h264_attr.u32MaxPicWidth = width;
-        h264_attr.u32MaxPicHeight = height;
-        h264_attr.u32PicWidth = width;         /*the picture width*/
-        h264_attr.u32PicHeight = height;       /*the picture height*/
-        h264_attr.u32BufSize = width * height; /*stream buffer size*/
-        h264_attr.u32Profile = 0; /*0: baseline; 1:MP; 2:HP;  3:svc_t */
-        h264_attr.bByFrame =
-            HI_TRUE; /*get stream mode is slice mode or frame mode?*/
-        h264_attr.u32BFrameNum =
-            0; /* 0: not support B frame; >=1: number of B frames */
-        h264_attr.u32RefNum = 1; /* 0: default; number of refrence frame*/
-
-        VENC_ATTR_H264_CBR_S h264_cbr;
-        memset(&h264_cbr, 0, sizeof(VENC_ATTR_H264_CBR_S));
-        h264_cbr.u32Gop = app_config.mp4_fps;
-        h264_cbr.u32StatTime = 1; /* stream rate statics time(s) */
-        h264_cbr.u32SrcFrmRate = app_config.mp4_fps; /* input (vi) frame rate */
-        h264_cbr.fr32DstFrmRate = app_config.mp4_fps; /* target frame rate */
-        h264_cbr.u32BitRate = app_config.mp4_bitrate;
-        h264_cbr.u32FluctuateLevel = 0; /* average bit rate */
-
-        venc_chn_attr.stVeAttr.enType = PT_H264;
-        venc_chn_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264CBR;
-        venc_chn_attr.stVeAttr.stAttrH264e = h264_attr;
-        venc_chn_attr.stRcAttr.stAttrH264Cbr = h264_cbr;
         s32Ret = HI_MPI_VENC_CreateChn(venc_chn, &venc_chn_attr);
         if (HI_SUCCESS != s32Ret) {
             printf(
@@ -935,36 +951,38 @@ int start_sdk() {
             return EXIT_FAILURE;
         }
 
-        VENC_CHN_ATTR_S venc_chn_attr;
-        memset(&venc_chn_attr, 0, sizeof(VENC_CHN_ATTR_S));
-
         unsigned int width = app_config.mjpeg_width;
         unsigned int height = app_config.mjpeg_height;
 
-        VENC_ATTR_MJPEG_S mjpeg_attr;
-        memset(&mjpeg_attr, 0, sizeof(VENC_ATTR_MJPEG_S));
-        mjpeg_attr.u32MaxPicWidth = width;
-        mjpeg_attr.u32MaxPicHeight = height;
-        mjpeg_attr.u32PicWidth = width;
-        mjpeg_attr.u32PicHeight = height;
-        mjpeg_attr.u32BufSize =
-            (((width + 15) >> 4) << 4) * (((height + 15) >> 4) << 4);
-        mjpeg_attr.bByFrame =
-            HI_TRUE; /*get stream mode is field mode  or frame mode*/
+        VENC_CHN_ATTR_S venc_chn_attr = {
+            .stVeAttr =
+                {
+                    .enType = PT_MJPEG,
+                    .MPEG_ATTR =
+                        {
+                            .u32MaxPicWidth = width,
+                            .u32MaxPicHeight = height,
+                            .u32PicWidth = width,
+                            .u32PicHeight = height,
+                            .u32BufSize = (((width + 15) >> 4) << 4) *
+                                          (((height + 15) >> 4) << 4),
+                            .bByFrame = HI_TRUE, // use full frames
+                        },
 
-        venc_chn_attr.stVeAttr.enType = PT_MJPEG;
-        memcpy(
-            &venc_chn_attr.stVeAttr.stAttrMjpeg, &mjpeg_attr,
-            sizeof(VENC_ATTR_MJPEG_S));
-        venc_chn_attr.stRcAttr.enRcMode = VENC_RC_MODE_MJPEGCBR;
-        venc_chn_attr.stRcAttr.stAttrMjpegeCbr.u32StatTime = 1;
-        venc_chn_attr.stRcAttr.stAttrMjpegeCbr.u32SrcFrmRate =
-            app_config.mjpeg_fps;
-        venc_chn_attr.stRcAttr.stAttrMjpegeCbr.fr32DstFrmRate =
-            app_config.mjpeg_fps;
-        venc_chn_attr.stRcAttr.stAttrMjpegeCbr.u32FluctuateLevel = 0;
-        venc_chn_attr.stRcAttr.stAttrMjpegeCbr.u32BitRate =
-            app_config.mjpeg_bitrate;
+                },
+            .stRcAttr =
+                {
+                    .enRcMode = VENC_RC_MODE_MJPEGCBR,
+                    .stAttrMjpegeCbr =
+                        {
+                            .u32StatTime = 1,
+                            .u32SrcFrmRate = app_config.mjpeg_fps,
+                            .fr32DstFrmRate = app_config.mjpeg_fps,
+                            .u32BitRate = app_config.mjpeg_bitrate,
+                        },
+                },
+        };
+
         s32Ret = HI_MPI_VENC_CreateChn(venc_chn, &venc_chn_attr);
         if (HI_SUCCESS != s32Ret) {
             printf(
@@ -995,7 +1013,7 @@ int start_sdk() {
         pthread_attr_getstacksize(&thread_attr, &stacksize);
         size_t new_stacksize = app_config.venc_stream_thread_stack_size;
         if (pthread_attr_setstacksize(&thread_attr, new_stacksize)) {
-            printf("Error:  Can't set stack size %ld\n", new_stacksize);
+            printf("Error:  Can't set stack size %zu\n", new_stacksize);
         }
         if (0 != pthread_create(
                      &gs_VencPid, &thread_attr, VENC_GetVencStreamProc, NULL)) {
@@ -1005,7 +1023,7 @@ int start_sdk() {
             return EXIT_FAILURE;
         }
         if (pthread_attr_setstacksize(&thread_attr, stacksize)) {
-            printf("Error:  Can't set stack size %ld\n", stacksize);
+            printf("Error:  Can't set stack size %zu\n", stacksize);
         }
         pthread_attr_destroy(&thread_attr);
     }

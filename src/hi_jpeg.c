@@ -1,4 +1,5 @@
 #include "hi_jpeg.h"
+
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
@@ -19,18 +20,23 @@
 #include <mpi_vi.h>
 #include <mpi_vpss.h>
 
+#include "compat.h"
+
 #include "hidemo.h"
-
 #include "night.h"
-
 #include "config/app_config.h"
-
 #include "hierrors.h"
 
 #define tag "[hi_jpeg]: "
 
 #define MAX_WIDTH  1920
 #define MAX_HEIGHT 1080
+
+#if HISILICON_SDK_GEN <= 2
+#define JPEG_ATTR stAttrJpeg
+#elif HISILICON_SDK_GEN == 3
+#define JPEG_ATTR stAttrJpege
+#endif
 
 VENC_CHN jpeg_venc_chn;
 bool jpeg_module_init = false;
@@ -67,7 +73,7 @@ int32_t InitJPEG() {
     memset(&venc_chn_attr, 0, sizeof(VENC_CHN_ATTR_S));
     venc_chn_attr.stVeAttr.enType = PT_JPEG;
     memcpy(
-        &venc_chn_attr.stVeAttr.stAttrJpeg, &jpeg_attr,
+        &venc_chn_attr.stVeAttr.JPEG_ATTR, &jpeg_attr,
         sizeof(VENC_ATTR_JPEG_S));
 
     s32Ret = HI_MPI_VENC_CreateChn(jpeg_venc_chn, &venc_chn_attr);
