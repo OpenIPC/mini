@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (start_sdk(&state) == EXIT_FAILURE)
-        keepRunning = 0;
+        return EXIT_FAILURE;
 
     if (app_config.night_mode_enable)
         start_monitor_light_sensor();
