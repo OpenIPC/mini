@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <sys/select.h>
 
 #include <mpi_ae.h>
 #include <mpi_af.h>
@@ -205,7 +206,7 @@ int32_t request_pic(
     memset(&venc_chn_attr, 0, sizeof(VENC_CHN_ATTR_S));
     venc_chn_attr.stVeAttr.enType = PT_JPEG;
     memcpy(
-        &venc_chn_attr.stVeAttr.stAttrJpeg, &jpeg_attr,
+        &venc_chn_attr.stVeAttr.JPEG_ATTR, &jpeg_attr,
         sizeof(VENC_ATTR_JPEG_S));
 
     s32Ret = HI_MPI_VENC_SetChnAttr(jpeg_venc_chn, &venc_chn_attr);
