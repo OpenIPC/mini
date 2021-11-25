@@ -24,9 +24,10 @@
 
 #include "config/app_config.h"
 #include "config/sensor_config.h"
-#include "jpeg.h"
+#include "hi_comm_3a.h"
 #include "hierrors.h"
 #include "http_post.h"
+#include "jpeg.h"
 #include "motion_detect.h"
 #include "rtsp/ringfifo.h"
 #include "rtsp/rtputils.h"
@@ -313,19 +314,23 @@ HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst) {
         "new venc: %d   vpss_grp: %d,   vpss_chn: %d\n", venc_chn, vpss_grp,
         vpss_chn);
 
-    VPSS_CHN_ATTR_S vpss_chn_attr;
-    memset(&vpss_chn_attr, 0, sizeof(VPSS_CHN_ATTR_S));
-    vpss_chn_attr.bSpEn = HI_FALSE;
-    vpss_chn_attr.bBorderEn = HI_FALSE;
-    vpss_chn_attr.bMirror = HI_FALSE;
-    vpss_chn_attr.bFlip = HI_FALSE;
-    vpss_chn_attr.s32SrcFrameRate = fps_src;
-    vpss_chn_attr.s32DstFrameRate = fps_dst;
-    vpss_chn_attr.stBorder.u32TopWidth = 0;
-    vpss_chn_attr.stBorder.u32BottomWidth = 0;
-    vpss_chn_attr.stBorder.u32LeftWidth = 0;
-    vpss_chn_attr.stBorder.u32RightWidth = 0;
-    vpss_chn_attr.stBorder.u32Color = 0;
+    VPSS_CHN_ATTR_S vpss_chn_attr = {
+        .bSpEn = HI_FALSE,
+        .bBorderEn = HI_FALSE,
+        .bMirror = HI_FALSE,
+        .bFlip = HI_FALSE,
+        .s32SrcFrameRate = fps_src,
+        .s32DstFrameRate = fps_dst,
+        .stBorder =
+            {
+                .u32TopWidth = 0,
+                .u32BottomWidth = 0,
+                .u32LeftWidth = 0,
+                .u32RightWidth = 0,
+                .u32Color = 0,
+            },
+    };
+
     HI_S32 s32Ret = HI_MPI_VPSS_SetChnAttr(vpss_grp, vpss_chn, &vpss_chn_attr);
     if (HI_SUCCESS != s32Ret) {
         printf(
@@ -334,14 +339,14 @@ HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst) {
         return EXIT_FAILURE;
     }
 
-    VPSS_CHN_MODE_S vpss_chn_mode;
-    memset(&vpss_chn_mode, 0, sizeof(VPSS_CHN_MODE_S));
-    vpss_chn_mode.enChnMode = VPSS_CHN_MODE_USER;
-    vpss_chn_mode.u32Width = sensor_config.vichn.dest_size_width;
-    vpss_chn_mode.u32Height = sensor_config.vichn.dest_size_height;
-    vpss_chn_mode.bDouble = HI_FALSE;
-    vpss_chn_mode.enPixelFormat = sensor_config.vichn.pix_format;
-    vpss_chn_mode.enCompressMode = sensor_config.vichn.compress_mode;
+    VPSS_CHN_MODE_S vpss_chn_mode = {
+        .enChnMode = VPSS_CHN_MODE_USER,
+        .u32Width = sensor_config.vichn.dest_size_width,
+        .u32Height = sensor_config.vichn.dest_size_height,
+        .bDouble = HI_FALSE,
+        .enPixelFormat = sensor_config.vichn.pix_format,
+        .enCompressMode = sensor_config.vichn.compress_mode,
+    };
     s32Ret = HI_MPI_VPSS_SetChnMode(vpss_grp, vpss_chn, &vpss_chn_mode);
     if (HI_SUCCESS != s32Ret) {
         printf(
@@ -358,16 +363,16 @@ HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst) {
         return EXIT_FAILURE;
     }
 
-    MPP_CHN_S src_chn;
-    memset(&src_chn, 0, sizeof(MPP_CHN_S));
-    src_chn.enModId = HI_ID_VPSS;
-    src_chn.s32DevId = vpss_grp;
-    src_chn.s32ChnId = vpss_chn;
-    MPP_CHN_S dest_chn;
-    memset(&dest_chn, 0, sizeof(MPP_CHN_S));
-    dest_chn.enModId = HI_ID_VENC;
-    dest_chn.s32DevId = 0;
-    dest_chn.s32ChnId = venc_chn;
+    MPP_CHN_S src_chn = {
+        .enModId = HI_ID_VPSS,
+        .s32DevId = vpss_grp,
+        .s32ChnId = vpss_chn,
+    };
+    MPP_CHN_S dest_chn = {
+        .enModId = HI_ID_VENC,
+        .s32DevId = 0,
+        .s32ChnId = venc_chn,
+    };
     s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
     if (HI_SUCCESS != s32Ret) {
         printf(
@@ -390,16 +395,16 @@ HI_S32 bind_vpss_venc(VENC_CHN venc_chn) {
         return EXIT_FAILURE;
     }
 
-    MPP_CHN_S src_chn;
-    memset(&src_chn, 0, sizeof(MPP_CHN_S));
-    src_chn.enModId = HI_ID_VPSS;
-    src_chn.s32DevId = vpss_grp;
-    src_chn.s32ChnId = vpss_chn;
-    MPP_CHN_S dest_chn;
-    memset(&dest_chn, 0, sizeof(MPP_CHN_S));
-    dest_chn.enModId = HI_ID_VENC;
-    dest_chn.s32DevId = 0;
-    dest_chn.s32ChnId = venc_chn;
+    MPP_CHN_S src_chn = {
+        .enModId = HI_ID_VPSS,
+        .s32DevId = vpss_grp,
+        .s32ChnId = vpss_chn,
+    };
+    MPP_CHN_S dest_chn = {
+        .enModId = HI_ID_VENC,
+        .s32DevId = 0,
+        .s32ChnId = venc_chn,
+    };
     s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
     if (HI_SUCCESS != s32Ret) {
         printf(
@@ -422,16 +427,16 @@ HI_S32 unbind_vpss_venc(VENC_CHN venc_chn) {
         return EXIT_FAILURE;
     }
 
-    MPP_CHN_S src_chn;
-    memset(&src_chn, 0, sizeof(MPP_CHN_S));
-    src_chn.enModId = HI_ID_VPSS;
-    src_chn.s32DevId = vpss_grp;
-    src_chn.s32ChnId = vpss_chn;
-    MPP_CHN_S dest_chn;
-    memset(&dest_chn, 0, sizeof(MPP_CHN_S));
-    dest_chn.enModId = HI_ID_VENC;
-    dest_chn.s32DevId = 0;
-    dest_chn.s32ChnId = venc_chn;
+    MPP_CHN_S src_chn = {
+        .enModId = HI_ID_VPSS,
+        .s32DevId = vpss_grp,
+        .s32ChnId = vpss_chn,
+    };
+    MPP_CHN_S dest_chn = {
+        .enModId = HI_ID_VENC,
+        .s32DevId = 0,
+        .s32ChnId = venc_chn,
+    };
     s32Ret = HI_MPI_SYS_UnBind(&src_chn, &dest_chn);
     if (HI_SUCCESS != s32Ret) {
         printf(
@@ -505,18 +510,15 @@ static HI_S32 HISDK_COMM_VI_SetMipiAttr(void) {
 
 #if HISILICON_SDK_GEN == 3
 static HI_S32 HISDK_COMM_VI_SetMipiAttr(void) {
-    HI_S32 fd;
-    combo_dev_attr_t *pstcomboDevAttr = NULL;
-
     /* mipi reset unrest */
-    fd = open(MIPI_DEV, O_RDWR);
+    int fd = open(MIPI_DEV, O_RDWR);
     if (fd < 0) {
         printf("warning: open hi_mipi dev failed\n");
         return EXIT_FAILURE;
     }
 
     combo_dev_attr_t mipi_attr = {
-        .devno = 0, .input_mode = sensor_config.input_mode, {}};
+        .devno = 0, .input_mode = sensor_config.input_mode};
 
     if (sensor_config.videv.input_mod == VI_MODE_MIPI) {
         mipi_attr.mipi_attr.wdr_mode = HI_MIPI_WDR_MODE_NONE;
@@ -552,16 +554,15 @@ static HI_S32 HISDK_COMM_VI_SetMipiAttr(void) {
             }
         }
     }
-    pstcomboDevAttr = &mipi_attr;
 
     /* 1. reset mipi */
-    ioctl(fd, HI_MIPI_RESET_MIPI, &pstcomboDevAttr->devno);
+    ioctl(fd, HI_MIPI_RESET_MIPI, &mipi_attr.devno);
 
     /* 2. reset sensor */
-    ioctl(fd, HI_MIPI_RESET_SENSOR, &pstcomboDevAttr->devno);
+    ioctl(fd, HI_MIPI_RESET_SENSOR, &mipi_attr.devno);
 
     /* 3. set mipi attr */
-    if (ioctl(fd, HI_MIPI_SET_DEV_ATTR, pstcomboDevAttr)) {
+    if (ioctl(fd, HI_MIPI_SET_DEV_ATTR, &mipi_attr)) {
         printf("ioctl HI_MIPI_SET_DEV_ATTR failed\n");
         close(fd);
         return HI_FAILURE;
@@ -570,10 +571,10 @@ static HI_S32 HISDK_COMM_VI_SetMipiAttr(void) {
     usleep(10000);
 
     /* 4. unreset mipi */
-    ioctl(fd, HI_MIPI_UNRESET_MIPI, &pstcomboDevAttr->devno);
+    ioctl(fd, HI_MIPI_UNRESET_MIPI, &mipi_attr.devno);
 
     /* 5. unreset sensor */
-    ioctl(fd, HI_MIPI_UNRESET_SENSOR, &pstcomboDevAttr->devno);
+    ioctl(fd, HI_MIPI_UNRESET_SENSOR, &mipi_attr.devno);
 
     close(fd);
     return HI_SUCCESS;
@@ -607,14 +608,19 @@ int start_sdk() {
     int u32AlignWidth = app_config.align_width;
     printf("u32AlignWidth: %d\n", app_config.align_width);
 
-    VB_CONF_S vb_conf;
-    memset(&vb_conf, 0, sizeof(VB_CONF_S));
-    vb_conf.u32MaxPoolCnt = app_config.max_pool_cnt;
     int u32BlkSize = SYS_CalcPicVbBlkSize(
         width, height, sensor_config.vichn.pix_format, u32AlignWidth);
-    vb_conf.astCommPool[0].u32BlkSize = u32BlkSize;
-    vb_conf.astCommPool[0].u32BlkCnt =
-        app_config.blk_cnt; // HI3516C = 10;  HI3516E = 4;
+    VB_CONF_S vb_conf = {
+        .u32MaxPoolCnt = app_config.max_pool_cnt,
+        .astCommPool =
+            {
+                {
+                    .u32BlkSize = u32BlkSize,
+                    .u32BlkCnt =
+                        app_config.blk_cnt, // HI3516C = 10;  HI3516E = 4;
+                },
+            },
+    };
     printf(
         "vb_conf: u32MaxPoolCnt %d    [0]u32BlkSize %d   [0]u32BlkCnt %d\n",
         vb_conf.u32MaxPoolCnt, u32BlkSize, app_config.blk_cnt);
@@ -627,10 +633,8 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
-    VB_SUPPLEMENT_CONF_S supplement_conf;
-    memset(&supplement_conf, 0, sizeof(VB_SUPPLEMENT_CONF_S));
-    supplement_conf.u32SupplementConf = 1;
-    s32Ret = HI_MPI_VB_SetSupplementConf(&supplement_conf);
+    s32Ret = HI_MPI_VB_SetSupplementConf(
+        &(VB_SUPPLEMENT_CONF_S){.u32SupplementConf = 1});
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_VB_SetSupplementConf failed with %#x!\n%s\n", s32Ret,
@@ -645,10 +649,8 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
-    MPP_SYS_CONF_S sys_conf;
-    memset(&sys_conf, 0, sizeof(MPP_SYS_CONF_S));
-    sys_conf.u32AlignWidth = u32AlignWidth;
-    s32Ret = HI_MPI_SYS_SetConf(&sys_conf);
+    s32Ret =
+        HI_MPI_SYS_SetConf(&(MPP_SYS_CONF_S){.u32AlignWidth = u32AlignWidth});
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_SYS_SetConf failed with %#x!\n%s\n", s32Ret,
@@ -671,30 +673,26 @@ int start_sdk() {
 
     sensor_register_callback();
 
-    state.isp_dev = 0;
-    ALG_LIB_S lib;
-    memset(&lib, 0, sizeof(ALG_LIB_S));
-    lib.s32Id = 0;
-    strcpy(lib.acLibName, "hisi_ae_lib");
-    s32Ret = HI_MPI_AE_Register(state.isp_dev, &lib);
+    s32Ret = HI_MPI_AE_Register(
+        state.isp_dev, &(ALG_LIB_S){.acLibName = "hisi_ae_lib"});
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_AE_Register failed with %#x!\n%s\n", s32Ret,
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
-    lib.s32Id = 0;
-    strcpy(lib.acLibName, "hisi_awb_lib");
-    s32Ret = HI_MPI_AWB_Register(state.isp_dev, &lib);
+
+    s32Ret = HI_MPI_AWB_Register(
+        state.isp_dev, &(ALG_LIB_S){.acLibName = "hisi_awb_lib"});
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_AWB_Register failed with %#x!\n%s\n", s32Ret,
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
-    lib.s32Id = 0;
-    strcpy(lib.acLibName, "hisi_af_lib");
-    s32Ret = HI_MPI_AF_Register(state.isp_dev, &lib);
+
+    s32Ret = HI_MPI_AF_Register(
+        state.isp_dev, &(ALG_LIB_S){.acLibName = "hisi_af_lib"});
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_AF_Register failed with %#x!\n%s\n", s32Ret,
@@ -730,10 +728,8 @@ int start_sdk() {
         }
     }
 
-    ISP_WDR_MODE_S wdr_mode;
-    memset(&wdr_mode, 0, sizeof(ISP_WDR_MODE_S));
-    wdr_mode.enWDRMode = sensor_config.mode;
-    s32Ret = HI_MPI_ISP_SetWDRMode(state.isp_dev, &wdr_mode);
+    s32Ret = HI_MPI_ISP_SetWDRMode(
+        state.isp_dev, &(ISP_WDR_MODE_S){.enWDRMode = sensor_config.mode});
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_ISP_SetWDRMode failed with %#x!\n%s\n", s32Ret,
@@ -741,15 +737,18 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
-    ISP_PUB_ATTR_S pub_attr;
-    memset(&pub_attr, 0, sizeof(ISP_PUB_ATTR_S));
-    pub_attr.stWndRect.s32X = sensor_config.isp.isp_x;
-    pub_attr.stWndRect.s32Y = sensor_config.isp.isp_y;
-    pub_attr.stWndRect.u32Width = sensor_config.isp.isp_w;
-    pub_attr.stWndRect.u32Height = sensor_config.isp.isp_h;
-    pub_attr.f32FrameRate = sensor_config.isp.isp_frame_rate;
-    pub_attr.enBayer = sensor_config.isp.isp_bayer;
-    s32Ret = HI_MPI_ISP_SetPubAttr(state.isp_dev, &pub_attr);
+    s32Ret = HI_MPI_ISP_SetPubAttr(
+        state.isp_dev, &(ISP_PUB_ATTR_S){
+                           .stWndRect =
+                               {
+                                   .s32X = sensor_config.isp.isp_x,
+                                   .s32Y = sensor_config.isp.isp_y,
+                                   .u32Width = sensor_config.isp.isp_w,
+                                   .u32Height = sensor_config.isp.isp_h,
+                               },
+                           .f32FrameRate = sensor_config.isp.isp_frame_rate,
+                           .enBayer = sensor_config.isp.isp_bayer,
+                       });
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_ISP_SetPubAttr failed with %#x!\n%s\n", s32Ret,
@@ -864,21 +863,27 @@ int start_sdk() {
     }
 
     state.vi_chn = 0;
-    VI_CHN_ATTR_S chn_attr;
-    memset(&chn_attr, 0, sizeof(VI_CHN_ATTR_S));
-    chn_attr.stCapRect.s32X = sensor_config.vichn.cap_rect_x;
-    chn_attr.stCapRect.s32Y = sensor_config.vichn.cap_rect_y;
-    chn_attr.stCapRect.u32Width = sensor_config.vichn.cap_rect_width;
-    chn_attr.stCapRect.u32Height = sensor_config.vichn.cap_rect_height;
-    chn_attr.stDestSize.u32Width = sensor_config.vichn.dest_size_width;
-    chn_attr.stDestSize.u32Height = sensor_config.vichn.dest_size_height;
-    chn_attr.enCapSel = sensor_config.vichn.cap_sel;
-    chn_attr.enPixFormat = sensor_config.vichn.pix_format;
-    chn_attr.bMirror = HI_FALSE;
-    chn_attr.bFlip = HI_FALSE;
-    chn_attr.s32SrcFrameRate = -1;
-    chn_attr.s32DstFrameRate = -1;
-    chn_attr.enCompressMode = sensor_config.vichn.compress_mode;
+    VI_CHN_ATTR_S chn_attr = {
+        .stCapRect =
+            {
+                .s32X = sensor_config.vichn.cap_rect_x,
+                .s32Y = sensor_config.vichn.cap_rect_y,
+                .u32Width = sensor_config.vichn.cap_rect_width,
+                .u32Height = sensor_config.vichn.cap_rect_height,
+            },
+        .stDestSize =
+            {
+                .u32Width = sensor_config.vichn.dest_size_width,
+                .u32Height = sensor_config.vichn.dest_size_height,
+            },
+        .enCapSel = sensor_config.vichn.cap_sel,
+        .enPixFormat = sensor_config.vichn.pix_format,
+        .bMirror = HI_FALSE,
+        .bFlip = HI_FALSE,
+        .s32SrcFrameRate = -1,
+        .s32DstFrameRate = -1,
+        .enCompressMode = sensor_config.vichn.compress_mode,
+    };
     s32Ret = HI_MPI_VI_SetChnAttr(state.vi_chn, &chn_attr);
     if (HI_SUCCESS != s32Ret) {
         printf(
@@ -908,16 +913,16 @@ int start_sdk() {
 
     {
         VPSS_GRP vpss_grp = 0;
-        VPSS_GRP_ATTR_S vpss_grp_attr;
-        memset(&vpss_grp_attr, 0, sizeof(VPSS_GRP_ATTR_S));
-        vpss_grp_attr.u32MaxW = sensor_config.vichn.dest_size_width;
-        vpss_grp_attr.u32MaxH = sensor_config.vichn.dest_size_height;
-        vpss_grp_attr.enPixFmt = sensor_config.vichn.pix_format;
-        vpss_grp_attr.bIeEn = HI_FALSE;
-        vpss_grp_attr.bDciEn = HI_FALSE;
-        vpss_grp_attr.bNrEn = HI_TRUE;
-        vpss_grp_attr.bHistEn = HI_FALSE;
-        vpss_grp_attr.enDieMode = VPSS_DIE_MODE_NODIE;
+        VPSS_GRP_ATTR_S vpss_grp_attr = {
+            .u32MaxW = sensor_config.vichn.dest_size_width,
+            .u32MaxH = sensor_config.vichn.dest_size_height,
+            .enPixFmt = sensor_config.vichn.pix_format,
+            .bIeEn = HI_FALSE,
+            .bDciEn = HI_FALSE,
+            .bNrEn = HI_TRUE,
+            .bHistEn = HI_FALSE,
+            .enDieMode = VPSS_DIE_MODE_NODIE,
+        };
         s32Ret = HI_MPI_VPSS_CreateGrp(vpss_grp, &vpss_grp_attr);
         if (HI_SUCCESS != s32Ret) {
             printf(
@@ -935,14 +940,16 @@ int start_sdk() {
         }
 
         {
-            MPP_CHN_S src_chn;
-            src_chn.enModId = HI_ID_VIU;
-            src_chn.s32DevId = 0;
-            src_chn.s32ChnId = 0;
-            MPP_CHN_S dest_chn;
-            dest_chn.enModId = HI_ID_VPSS;
-            dest_chn.s32DevId = vpss_grp;
-            dest_chn.s32ChnId = 0;
+            MPP_CHN_S src_chn = {
+                .enModId = HI_ID_VIU,
+                .s32DevId = 0,
+                .s32ChnId = 0,
+            };
+            MPP_CHN_S dest_chn = {
+                .enModId = HI_ID_VPSS,
+                .s32DevId = vpss_grp,
+                .s32ChnId = 0,
+            };
             s32Ret = HI_MPI_SYS_Bind(&src_chn, &dest_chn);
             if (HI_SUCCESS != s32Ret) {
                 printf(
@@ -1144,14 +1151,16 @@ int stop_sdk() {
         }
 
         {
-            MPP_CHN_S src_chn;
-            src_chn.enModId = HI_ID_VIU;
-            src_chn.s32DevId = 0;
-            src_chn.s32ChnId = 0;
-            MPP_CHN_S dest_chn;
-            dest_chn.enModId = HI_ID_VPSS;
-            dest_chn.s32DevId = vpss_grp;
-            dest_chn.s32ChnId = 0;
+            MPP_CHN_S src_chn = {
+                .enModId = HI_ID_VIU,
+                .s32DevId = 0,
+                .s32ChnId = 0,
+            };
+            MPP_CHN_S dest_chn = {
+                .enModId = HI_ID_VPSS,
+                .s32DevId = vpss_grp,
+                .s32ChnId = 0,
+            };
             s32Ret = HI_MPI_SYS_UnBind(&src_chn, &dest_chn);
             if (HI_SUCCESS != s32Ret) {
                 printf(
@@ -1188,28 +1197,26 @@ int stop_sdk() {
     }
     pthread_join(gs_IspPid, NULL);
 
-    ALG_LIB_S lib;
-    lib.s32Id = 0;
-    strcpy(lib.acLibName, "hisi_af_lib\0        ");
-    s32Ret = HI_MPI_AF_UnRegister(state.isp_dev, &lib);
+    s32Ret = HI_MPI_AF_UnRegister(
+        state.isp_dev, &(ALG_LIB_S){.acLibName = "hisi_af_lib"});
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_AF_UnRegister failed with %#x!\n%s\n", s32Ret,
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
-    lib.s32Id = 0;
-    strcpy(lib.acLibName, "hisi_awb_lib\0       ");
-    s32Ret = HI_MPI_AWB_UnRegister(state.isp_dev, &lib);
+
+    s32Ret = HI_MPI_AWB_UnRegister(
+        state.isp_dev, &(ALG_LIB_S){.acLibName = "hisi_awb_lib"});
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_AWB_UnRegister failed with %#x!\n%s\n", s32Ret,
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
-    lib.s32Id = 0;
-    strcpy(lib.acLibName, "hisi_ae_lib\0        ");
-    s32Ret = HI_MPI_AE_UnRegister(state.isp_dev, &lib);
+
+    s32Ret = HI_MPI_AE_UnRegister(
+        state.isp_dev, &(ALG_LIB_S){.acLibName = "hisi_ae_lib"});
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_AE_UnRegister failed with %#x!\n%s\n", s32Ret,
@@ -1239,12 +1246,10 @@ int stop_sdk() {
 }
 
 #if HISILICON_SDK_GEN == 3
-
 #define BROKEN_MMAP
 #include "mmap.h"
 
 void *mmap(void *start, size_t len, int prot, int flags, int fd, uint32_t off) {
     return mmap64(start, len, prot, flags, fd, off);
 }
-
 #endif

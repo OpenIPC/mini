@@ -30,8 +30,8 @@ $ cmake --build build
 
 ### Hardware for development
 
-We consider buying (HiSilicon 3516CV300 + Sony IMX291
-board)[https://aliexpress.com/item/1005002315913099.html] to use it as
+We consider buying [HiSilicon 3516CV300 + Sony IMX291
+board](https://aliexpress.com/item/1005002315913099.html) to use it as
 development kit. It has 128Mb of RAM and 16Mb of SPI Flash ROM. Use
 [Coupler](https://github.com/OpenIPC/coupler) to get rid of stock firmware and
 install OpenIPC (you don't even need to solder anything like UART adapter).
