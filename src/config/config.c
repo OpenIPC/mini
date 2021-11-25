@@ -242,3 +242,66 @@ enum ConfigError parse_array(
 
     return CONFIG_OK;
 }
+
+enum ConfigError parse_uint64(
+    struct IniConfig *ini, const char *section, const char *param_name,
+    const uint64_t min, const uint64_t max, uint64_t *int_value) {
+    char param_value[64];
+    enum ConfigError err = parse_param_value(
+        ini, section, param_name, param_value);
+    if (err != CONFIG_OK)
+        return err;
+
+    // try to parse as number
+    char *end = NULL;
+    uint64_t res = strtoull(param_value, &end, 10);
+    if (*end) {
+        res = strtoull(param_value, &end, 16);
+    }
+    if (!*end) {
+        if (res < min || res > max) {
+            printf(
+                "Can't parse param '%s' value '%s'. Value '%lld' is not in a "
+                "range [%lld; %lld].\n",
+                param_name, param_value, res, min, max);
+            return CONFIG_PARAM_ISNT_IN_RANGE;
+        }
+        *int_value = (uint64_t)res;
+        return CONFIG_OK;
+    }
+    if (strcmp(param_value, "true") == 0) {
+        *int_value = 1;
+        return CONFIG_OK;
+    }
+    if (strcmp(param_value, "TRUE") == 0) {
+        *int_value = 1;
+        return CONFIG_OK;
+    }
+    if (strcmp(param_value, "false") == 0) {
+        *int_value = 0;
+        return CONFIG_OK;
+    }
+    if (strcmp(param_value, "FALSE") == 0) {
+        *int_value = 0;
+        return CONFIG_OK;
+    }
+
+    printf(
+        "Can't parse param '%s' value '%s'. Is not a integer (dec or hex) "
+        "number.",
+        param_name, param_value);
+    return CONFIG_PARAM_ISNT_NUMBER;
+}
+
+
+enum ConfigError parse_uint32(
+    struct IniConfig *ini, const char *section, const char *param_name,
+    const uint32_t min, const uint32_t max, uint32_t *value) {
+    uint64_t val = 0;
+    enum ConfigError err =
+        parse_uint64(ini, section, param_name, min, max, &val);
+    if (err != CONFIG_OK)
+        return err;
+    *value = val;
+    return CONFIG_OK;
+}

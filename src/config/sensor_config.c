@@ -179,13 +179,13 @@ enum ConfigError parse_config_videv(
         if (err != CONFIG_OK)
             return err;
     }
-    err = parse_int(ini, section, "Mask_num", 0, 2, &videv->mask_num);
+    err = parse_uint32(ini, section, "Mask_num", 0, 2, &videv->mask_num);
     if (err != CONFIG_OK)
         return err;
-    err = parse_int(ini, section, "Mask_0", 0, INT_MAX, &videv->mask_0);
+    err = parse_uint32(ini, section, "Mask_0", 0, UINT_MAX, &videv->mask_0);
     if (err != CONFIG_OK)
         return err;
-    err = parse_int(ini, section, "Mask_1", 0, INT_MAX, &videv->mask_1);
+    err = parse_uint32(ini, section, "Mask_1", 0, UINT_MAX, &videv->mask_1);
     if (err != CONFIG_OK)
         return err;
     {

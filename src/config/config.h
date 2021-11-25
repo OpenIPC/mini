@@ -44,3 +44,6 @@ enum ConfigError parse_bool(
 enum ConfigError parse_array(
     struct IniConfig *ini, const char *section, const char *param_name,
     int *array, const int array_size);
+enum ConfigError parse_uint32(
+    struct IniConfig *ini, const char *section, const char *param_name,
+    const uint32_t min, const uint32_t max, uint32_t *value);
