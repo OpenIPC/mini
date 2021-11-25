@@ -1,16 +1,7 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include <hi_comm_isp.h>
-#include <hi_comm_vi.h>
-#include <hi_mipi.h>
-#ifdef __cplusplus
-}
-#endif
-
 #include "config.h"
+#include "compat.h"
 
 struct SensorMIPI {
     raw_data_type_e data_type;
@@ -20,23 +11,16 @@ struct SensorMIPI {
 struct SensorLVDS {
     int img_size_w;
     int img_size_h;
-    wdr_mode_e wdr_mode;
-    lvds_sync_mode_e sync_mode;
-    raw_data_type_e raw_data_type;
-    lvds_bit_endian data_endian;
-    lvds_bit_endian sync_code_endian;
+    wdr_mode_t wdr_mode;
+    lvds_sync_mode_t sync_mode;
+    data_type_t raw_data_type;
+    lvds_bit_endian_t data_endian;
+    lvds_bit_endian_t sync_code_endian;
     int lane_id[8];
     int lvds_lane_num;
     int wdr_vc_num;
     int sync_code_num;
-    int sync_code_0[16];
-    int sync_code_1[16];
-    int sync_code_2[16];
-    int sync_code_3[16];
-    int sync_code_4[16];
-    int sync_code_5[16];
-    int sync_code_6[16];
-    int sync_code_7[16];
+    int sync_code[8][16];
 };
 
 struct SensorVIDEV {
@@ -108,7 +92,6 @@ struct SensorConfig {
 
     // [mode]
     input_mode_t input_mode;
-    int dev_attr;
 
     // [mipi]
     struct SensorMIPI mipi;

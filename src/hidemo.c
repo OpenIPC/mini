@@ -40,6 +40,8 @@
 #define MPEG_ATTR stAttrMjpege
 #endif
 
+#define MIPI_DEV "/dev/hi_mipi"
+
 struct SDKState state;
 
 HI_S32 HI_MPI_SYS_GetChipId(HI_U32 *pu32ChipId);
@@ -490,6 +492,102 @@ int SYS_CalcPicVbBlkSize(
     return u32VbSize;
 }
 
+#if HISILICON_SDK_GEN == 2
+static HI_S32 HISDK_COMM_VI_SetMipiAttr(void) {
+    /* mipi reset unrest */
+    HI_S32 fd = open(MIPI_DEV, O_RDWR);
+    if (fd < 0) {
+        printf("warning: open hi_mipi dev failed\n");
+        return EXIT_FAILURE;
+    }
+    combo_dev_attr_t mipi_attr = {.input_mode = sensor_config.input_mode, {}};
+    if (ioctl(fd, _IOW('m', 0x01, combo_dev_attr_t), &mipi_attr)) {
+        printf("set mipi attr failed\n");
+        close(fd);
+        return EXIT_FAILURE;
+    }
+    close(fd);
+    return HI_SUCCESS;
+}
+#endif
+
+#if HISILICON_SDK_GEN == 3
+static HI_S32 HISDK_COMM_VI_SetMipiAttr(void) {
+    HI_S32 fd;
+    combo_dev_attr_t *pstcomboDevAttr = NULL;
+
+    /* mipi reset unrest */
+    fd = open(MIPI_DEV, O_RDWR);
+    if (fd < 0) {
+        printf("warning: open hi_mipi dev failed\n");
+        return EXIT_FAILURE;
+    }
+
+    combo_dev_attr_t mipi_attr = {
+        .devno = 0, .input_mode = sensor_config.input_mode, {}};
+
+    if (sensor_config.videv.input_mod == VI_MODE_MIPI) {
+        mipi_attr.mipi_attr.wdr_mode = HI_MIPI_WDR_MODE_NONE;
+        mipi_attr.mipi_attr.raw_data_type = sensor_config.mipi.data_type;
+        for (int i = 0; i < 4; i++) {
+            mipi_attr.mipi_attr.lane_id[i] = sensor_config.mipi.lane_id[i];
+        }
+    }
+
+    if (sensor_config.videv.input_mod == VI_MODE_LVDS) {
+        mipi_attr.lvds_attr.img_size.width = sensor_config.lvds.img_size_w;
+        mipi_attr.lvds_attr.img_size.height = sensor_config.lvds.img_size_h;
+        mipi_attr.lvds_attr.raw_data_type = sensor_config.lvds.raw_data_type;
+        mipi_attr.lvds_attr.wdr_mode = sensor_config.lvds.wdr_mode;
+        mipi_attr.lvds_attr.sync_mode = sensor_config.lvds.sync_mode;
+        mipi_attr.lvds_attr.vsync_type.sync_type = LVDS_VSYNC_NORMAL;
+        mipi_attr.lvds_attr.vsync_type.hblank1 = 0;
+        mipi_attr.lvds_attr.vsync_type.hblank2 = 0;
+        mipi_attr.lvds_attr.fid_type.fid = LVDS_FID_NONE;
+        mipi_attr.lvds_attr.fid_type.output_fil = HI_TRUE;
+        mipi_attr.lvds_attr.data_endian = sensor_config.lvds.data_endian;
+        mipi_attr.lvds_attr.sync_code_endian =
+            sensor_config.lvds.sync_code_endian;
+        for (int i = 0; i < 4; i++) {
+            mipi_attr.lvds_attr.lane_id[i] = sensor_config.lvds.lane_id[i];
+        }
+        for (int i = 0; i < LVDS_LANE_NUM; i++) {
+            for (int j = 0; j < WDR_VC_NUM; j++) {
+                for (int m = 0; m < SYNC_CODE_NUM; m++) {
+                    mipi_attr.lvds_attr.sync_code[i][j][m] =
+                        sensor_config.lvds.sync_code[i][j * 4 + m];
+                }
+            }
+        }
+    }
+    pstcomboDevAttr = &mipi_attr;
+
+    /* 1. reset mipi */
+    ioctl(fd, HI_MIPI_RESET_MIPI, &pstcomboDevAttr->devno);
+
+    /* 2. reset sensor */
+    ioctl(fd, HI_MIPI_RESET_SENSOR, &pstcomboDevAttr->devno);
+
+    /* 3. set mipi attr */
+    if (ioctl(fd, HI_MIPI_SET_DEV_ATTR, pstcomboDevAttr)) {
+        printf("ioctl HI_MIPI_SET_DEV_ATTR failed\n");
+        close(fd);
+        return HI_FAILURE;
+    }
+
+    usleep(10000);
+
+    /* 4. unreset mipi */
+    ioctl(fd, HI_MIPI_UNRESET_MIPI, &pstcomboDevAttr->devno);
+
+    /* 5. unreset sensor */
+    ioctl(fd, HI_MIPI_UNRESET_SENSOR, &pstcomboDevAttr->devno);
+
+    close(fd);
+    return HI_SUCCESS;
+}
+#endif
+
 pthread_t gs_VencPid = 0;
 pthread_t gs_IspPid = 0;
 
@@ -574,19 +672,10 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
-    /* mipi reset unrest */
-    HI_S32 fd = open("/dev/hi_mipi", O_RDWR);
-    if (fd < 0) {
-        printf("warning: open hi_mipi dev failed\n");
+    s32Ret = HISDK_COMM_VI_SetMipiAttr();
+    if (HI_SUCCESS != s32Ret) {
         return EXIT_FAILURE;
     }
-    combo_dev_attr_t mipi_attr = {.input_mode = sensor_config.input_mode, {}};
-    if (ioctl(fd, _IOW('m', 0x01, combo_dev_attr_t), &mipi_attr)) {
-        printf("set mipi attr failed\n");
-        close(fd);
-        return EXIT_FAILURE;
-    }
-    close(fd);
 
     sensor_register_callback();
 

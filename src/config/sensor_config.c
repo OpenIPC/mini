@@ -111,30 +111,13 @@ enum ConfigError parse_config_lvds(
         ini, section, "sync_code_num", INT_MIN, INT_MAX, &lvds->sync_code_num);
     if (err != CONFIG_OK)
         return err;
-    err = parse_array(ini, section, "sync_code_0", lvds->sync_code_0, 16);
-    if (err != CONFIG_OK)
-        return err;
-    err = parse_array(ini, section, "sync_code_1", lvds->sync_code_1, 16);
-    if (err != CONFIG_OK)
-        return err;
-    err = parse_array(ini, section, "sync_code_2", lvds->sync_code_2, 16);
-    if (err != CONFIG_OK)
-        return err;
-    err = parse_array(ini, section, "sync_code_3", lvds->sync_code_3, 16);
-    if (err != CONFIG_OK)
-        return err;
-    err = parse_array(ini, section, "sync_code_4", lvds->sync_code_4, 16);
-    if (err != CONFIG_OK)
-        return err;
-    err = parse_array(ini, section, "sync_code_5", lvds->sync_code_5, 16);
-    if (err != CONFIG_OK)
-        return err;
-    err = parse_array(ini, section, "sync_code_6", lvds->sync_code_6, 16);
-    if (err != CONFIG_OK)
-        return err;
-    err = parse_array(ini, section, "sync_code_7", lvds->sync_code_7, 16);
-    if (err != CONFIG_OK)
-        return err;
+    char syncname[16];
+    for (int i = 0; i < 8; i++) {
+        sprintf(syncname, "sync_code_%d", i);
+        err = parse_array(ini, section, syncname, lvds->sync_code[i], 16);
+        if (err != CONFIG_OK)
+            return err;
+    }
     return CONFIG_OK;
 }
 
@@ -604,30 +587,31 @@ enum ConfigError parse_sensor_config(char *path, struct SensorConfig *config) {
         if (err != CONFIG_OK)
             goto RET_ERR;
     }
-    err = parse_int(&ini, "mode", "dev_attr", 0, 2, &config->dev_attr);
-    if (err != CONFIG_OK)
-        goto RET_ERR;
 
-    // [mipi]
-    {
-        const char *possible_values[] = {// starts from 1 !!!!!
-                                         "RAW_DATA_8BIT", "RAW_DATA_10BIT",
-                                         "RAW_DATA_12BIT", "RAW_DATA_14BIT"};
-        const int count = sizeof(possible_values) / sizeof(const char *);
-        err = parse_enum(
-            &ini, "mipi", "data_type", (void *)&config->mipi.data_type,
-            possible_values, count, 1);
+    if (config->input_mode == INPUT_MODE_MIPI) {
+        // [mipi]
+        {
+            const char *possible_values[] = {// starts from 1 !!!!!
+                                             "RAW_DATA_8BIT", "RAW_DATA_10BIT",
+                                             "RAW_DATA_12BIT",
+                                             "RAW_DATA_14BIT"};
+            const int count = sizeof(possible_values) / sizeof(const char *);
+            err = parse_enum(
+                &ini, "mipi", "data_type", (void *)&config->mipi.data_type,
+                possible_values, count, 1);
+            if (err != CONFIG_OK)
+                goto RET_ERR;
+        }
+        err = parse_array(&ini, "mipi", "lane_id", config->mipi.lane_id, 8);
+        if (err != CONFIG_OK)
+            goto RET_ERR;
+    } else if (config->input_mode == INPUT_MODE_LVDS) {
+        // [lvds]
+        err = parse_config_lvds(&ini, "lvds", &config->lvds);
         if (err != CONFIG_OK)
             goto RET_ERR;
     }
-    err = parse_array(&ini, "mipi", "lane_id", config->mipi.lane_id, 8);
-    if (err != CONFIG_OK)
-        goto RET_ERR;
 
-    // [lvds]
-    err = parse_config_lvds(&ini, "lvds", &config->lvds);
-    if (err != CONFIG_OK)
-        goto RET_ERR;
     // [isp_image]
     err = parse_config_isp(&ini, "ips_image", &config->isp);
     if (err != CONFIG_OK)
