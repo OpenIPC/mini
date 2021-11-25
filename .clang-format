@@ -1,0 +1,6 @@
+---
+BasedOnStyle: LLVM
+IndentWidth: 4
+AlignAfterOpenBracket: AlwaysBreak
+AlignConsecutiveMacros: true
+StatementMacros: ["vfunc", "vfuncDefault", "AUDIO_FORMATS"]
