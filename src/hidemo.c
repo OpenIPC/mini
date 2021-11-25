@@ -1007,6 +1007,7 @@ int start_sdk() {
                             .fr32DstFrmRate =
                                 app_config.mp4_fps, /* target frame rate */
                             .u32BitRate = app_config.mp4_bitrate,
+                            .u32FluctuateLevel = 1,
                         },
                 },
         };
@@ -1068,6 +1069,7 @@ int start_sdk() {
                             .u32SrcFrmRate = app_config.mjpeg_fps,
                             .fr32DstFrmRate = app_config.mjpeg_fps,
                             .u32BitRate = app_config.mjpeg_bitrate,
+                            .u32FluctuateLevel = 1,
                         },
                 },
         };
@@ -1240,3 +1242,14 @@ int stop_sdk() {
     printf("Stop sdk Ok!\n");
     return EXIT_SUCCESS;
 }
+
+#if HISILICON_SDK_GEN == 3
+
+#define BROKEN_MMAP
+#include "mmap.h"
+
+void *mmap(void *start, size_t len, int prot, int flags, int fd, uint32_t off) {
+    return mmap64(start, len, prot, flags, fd, off);
+}
+
+#endif

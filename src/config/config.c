@@ -223,5 +223,22 @@ enum ConfigError parse_array(
     if (err != CONFIG_OK)
         return err;
 
+    const char *token = strtok(param_value, "|");
+    for (int i = 0; token && i < array_size; i++) {
+        char *end = NULL;
+        int64_t res = strtol(token, &end, 10);
+        if (*end)
+            res = strtol(token, &end, 16);
+        if (*end) {
+            printf(
+                "Can't parse param '%s' value '%s'. Is not a integer (dec or "
+                "hex) number.",
+                param_name, token);
+            return CONFIG_PARAM_ISNT_NUMBER;
+        }
+        array[i] = (int)res;
+        token = strtok(NULL, "|");
+    }
+
     return CONFIG_OK;
 }

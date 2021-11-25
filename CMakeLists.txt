@@ -53,6 +53,7 @@ add_executable(${PROJECT_NAME}
     src/http_post.c
     src/http_post.h
     src/main.c
+    src/mmap.h
     src/motion_detect.c
     src/motion_detect.h
     src/night.c
