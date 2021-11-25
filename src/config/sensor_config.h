@@ -3,9 +3,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-    #include <hi_comm_isp.h>
-    #include <hi_mipi.h>
-    #include <hi_comm_vi.h>
+#include <hi_comm_isp.h>
+#include <hi_comm_vi.h>
+#include <hi_mipi.h>
 #ifdef __cplusplus
 }
 #endif
@@ -125,7 +125,6 @@ struct SensorConfig {
     // [vi_chn]
     struct SensorVIChn vichn;
 };
-
 
 extern struct SensorConfig sensor_config;
 

@@ -1,12 +1,12 @@
 #include "sensor.h"
 
+#include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
-#include <limits.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #include <dlfcn.h>
 #include <inttypes.h>
@@ -18,7 +18,7 @@ void *libsns_so = NULL;
 int tryLoadLibrary(const char *path) {
     printf("try to load: %s\n", path);
     libsns_so = dlopen(path, RTLD_NOW | RTLD_GLOBAL);
-    printf("libsns_so 0x%016" PRIXPTR "\n", (uintptr_t) libsns_so);
+    printf("libsns_so 0x%016" PRIXPTR "\n", (uintptr_t)libsns_so);
     if (libsns_so == NULL) {
         printf("dlopen \"%s\" error: %s\n", path, dlerror());
         return 0;
@@ -38,7 +38,8 @@ int LoadSensorLibrary(const char *libsns_name) {
         }
     }
     sensor_register_callback_fn = dlsym(libsns_so, "sensor_register_callback");
-    sensor_unregister_callback_fn = dlsym(libsns_so, "sensor_unregister_callback");
+    sensor_unregister_callback_fn =
+        dlsym(libsns_so, "sensor_unregister_callback");
     return 1;
 }
 
@@ -47,9 +48,5 @@ void UnloadSensorLibrary() {
     libsns_so = NULL;
 }
 
-int sensor_register_callback(void) {
-    return sensor_register_callback_fn();
-}
-int sensor_unregister_callback(void) {
-    return sensor_unregister_callback_fn();
-}
+int sensor_register_callback(void) { return sensor_register_callback_fn(); }
+int sensor_unregister_callback(void) { return sensor_unregister_callback_fn(); }

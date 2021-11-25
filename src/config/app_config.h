@@ -48,7 +48,6 @@ struct AppConfig {
     uint32_t venc_stream_thread_stack_size;
     uint32_t web_server_thread_stack_size;
 
-
     uint32_t align_width;
     uint32_t max_pool_cnt;
     uint32_t blk_cnt;

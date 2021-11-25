@@ -1,12 +1,12 @@
 #include "night.h"
+#include <fcntl.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
-#include <fcntl.h>
-#include <pthread.h>
 #include <unistd.h>
-#include <signal.h>
 
 #include "config/app_config.h"
 #include "hidemo.h"
@@ -17,9 +17,7 @@
 
 static bool night_mode = false;
 
-bool night_mode_is_enable() {
-    return night_mode;
-}
+bool night_mode_is_enable() { return night_mode; }
 
 void ircut_on() {
     set_pin_linux(app_config.ir_cut_pin1, false);
@@ -53,18 +51,17 @@ void set_night_mode(bool night) {
 
 extern bool keepRunning;
 
-void* night_thread_func(void *vargp)  {
+void *night_thread_func(void *vargp) {
     usleep(1000);
     set_night_mode(night_mode);
 
     while (keepRunning) {
         bool state = false;
-        if(!get_pin_linux(app_config.ir_sensor_pin, &state)) {
+        if (!get_pin_linux(app_config.ir_sensor_pin, &state)) {
             printf(tag "get_pin_linux(app_config.ir_sensor_pin) error\n");
             sleep(app_config.check_interval_s);
             continue;
         }
-        // printf(tag "get_pin_linux(app_config.ir_sensor_pin) %d\n", state);
         if (night_mode != state) {
             night_mode = state;
             set_night_mode(night_mode);
@@ -79,10 +76,14 @@ int32_t start_monitor_light_sensor() {
     pthread_attr_t thread_attr;
     pthread_attr_init(&thread_attr);
     size_t stacksize;
-    pthread_attr_getstacksize(&thread_attr,&stacksize);
-    size_t new_stacksize = 16*1024;
-    if (pthread_attr_setstacksize(&thread_attr, new_stacksize)) { printf(tag "Error:  Can't set stack size %ld\n", new_stacksize); }
+    pthread_attr_getstacksize(&thread_attr, &stacksize);
+    size_t new_stacksize = 16 * 1024;
+    if (pthread_attr_setstacksize(&thread_attr, new_stacksize)) {
+        printf(tag "Error:  Can't set stack size %ld\n", new_stacksize);
+    }
     pthread_create(&thread_id, &thread_attr, night_thread_func, NULL);
-    if (pthread_attr_setstacksize(&thread_attr, stacksize)) { printf(tag "Error:  Can't set stack size %ld\n", stacksize); }
+    if (pthread_attr_setstacksize(&thread_attr, stacksize)) {
+        printf(tag "Error:  Can't set stack size %ld\n", stacksize);
+    }
     pthread_attr_destroy(&thread_attr);
 }

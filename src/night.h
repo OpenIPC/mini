@@ -1,7 +1,7 @@
 #pragma once
-#include <unistd.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <unistd.h>
 
 bool night_mode_is_enable();
 

@@ -1,8 +1,7 @@
 #pragma once
 
-#include <stdint.h>
 #include <stdbool.h>
-
+#include <stdint.h>
 
 #define ISP_BASE 0x20580000
 static const uint32_t ISP_VERSION = ISP_BASE + 0x20080;
@@ -27,7 +26,8 @@ static const uint32_t GPIO_DIR = 0x0400;
 #define GPIO7 0x201B0000
 #define GPIO8 0x201C0000
 
-static const uint32_t GPIO[] = {GPIO0, GPIO1, GPIO2, GPIO3, GPIO4, GPIO5, GPIO6, GPIO7, GPIO8};
+static const uint32_t GPIO[] = {GPIO0, GPIO1, GPIO2, GPIO3, GPIO4,
+                                GPIO5, GPIO6, GPIO7, GPIO8};
 
 struct Pin {
     uint8_t port;
@@ -38,11 +38,11 @@ struct Pin {
     char desc[128];
 };
 
-struct Pin* get_pins_hi3518EV200();
+struct Pin *get_pins_hi3518EV200();
 uint8_t get_pins_hi3518EV200_size();
 
-bool pin_linux_to_port_pin(const uint8_t pin_number, uint8_t *port, uint8_t *pin);
-
+bool pin_linux_to_port_pin(
+    const uint8_t pin_number, uint8_t *port, uint8_t *pin);
 
 bool set_pin_linux(const uint8_t pin_number, const bool bit);
 bool get_pin_linux(const uint8_t pin_number, bool *value);

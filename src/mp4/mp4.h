@@ -1,10 +1,10 @@
 #pragma once
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "bitbuf.h"
-#include "moov.h"
 #include "moof.h"
+#include "moov.h"
 #include "nal.h"
 
 extern uint32_t default_sample_size;
@@ -31,16 +31,16 @@ struct Mp4Context {
     struct BitBuf buf_mdat;
 };
 
-
-enum BufError set_slice(struct Mp4Context *ctx, const char* nal_data, const uint32_t nal_len, const enum NalUnitType unit_type);
-void set_sps(struct Mp4Context *ctx, const char* nal_data, const uint32_t nal_len);
-void set_pps(struct Mp4Context *ctx, const char* nal_data, const uint32_t nal_len);
+enum BufError set_slice(
+    struct Mp4Context *ctx, const char *nal_data, const uint32_t nal_len,
+    const enum NalUnitType unit_type);
+void set_sps(
+    struct Mp4Context *ctx, const char *nal_data, const uint32_t nal_len);
+void set_pps(
+    struct Mp4Context *ctx, const char *nal_data, const uint32_t nal_len);
 
 enum BufError get_header(struct Mp4Context *ctx, struct BitBuf *ptr);
 
 enum BufError set_mp4_state(struct Mp4Context *ctx, struct Mp4State *state);
 enum BufError get_moof(struct Mp4Context *ctx, struct BitBuf *ptr);
 enum BufError get_mdat(struct Mp4Context *ctx, struct BitBuf *ptr);
-
-
-
