@@ -1,22 +1,16 @@
 cmake_minimum_required(VERSION 2.8.12)
 project(mini C)
 
-# set(CMAKE_C_STANDARD 99)
-set(CMAKE_C_FLAGS "-std=gnu99")
+set(CMAKE_C_STANDARD 99)
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+
+find_package(HiSiliconSDK REQUIRED)
+find_package(Threads REQUIRED)
 
 include_directories(
     ./src/
-    ${HISILICON_SDK_DIR}/mpp/include
-)
-
-link_directories(
-    ${HISILICON_SDK_DIR}/mpp/lib
-)
-
-set(HILIBS
-    isp _hiae _hiawb _hiaf _hidefog
-    ive md mpi tde upvqe dnvqe VoiceEngine
-    dl
+    ${VENDOR_SDK_INCLUDE_DIRS}
 )
 
 add_executable(mini
@@ -72,5 +66,11 @@ add_executable(mini
     src/hi_jpeg.c
     src/main.c
 )
-target_link_libraries( mini pthread ${HILIBS} )
-install(TARGETS mini RUNTIME DESTINATION /usr/bin/)
+
+target_link_libraries(mini
+    ${HILIBS}
+    ${VENDOR_SDK_LIBRARIES}
+    Threads::Threads
+    dl)
+
+install(TARGETS mini RUNTIME DESTINATION /usr/bin)
