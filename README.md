@@ -43,6 +43,8 @@ install OpenIPC (you don't even need to solder anything like UART adapter).
 --long_sensor` to determine sensor type and its control bus and then manually
 specify appropriate sensor config file path in `sensor_config` in `mini.ini`
 
+-----
+
 ### Support
 
 OpenIPC offers two levels of support.
