@@ -6,7 +6,8 @@ OpenSource Mini IP camera streamer
 
 ### Maintainers Wanted
 
-The project is currently looking for a maintainer (the original author doesn't have time anymore due to his business). 
+The project is currently looking for a maintainer (the original author doesn't have time anymore due to his business).
+
 Please contact [IgorZalatov](mailto:flyrouter@gmail.com) to inquire further.
 
 ### Platform support
