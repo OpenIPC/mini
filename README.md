@@ -4,9 +4,8 @@ OpenSource Mini IP camera streamer
 
 ### Maintainers Wanted
 
-The project is currently looking for a maintainer (the original author doesn't
-have time anymore due to his business). Please contact [Igor
-Zalatov](mailto:flyrouter@gmail.com) to inquire further.
+The project is currently looking for a maintainer (the original author doesn't have time anymore due to his business). 
+Please contact [IgorZalatov](mailto:flyrouter@gmail.com) to inquire further.
 
 ### Platform support
 
@@ -74,3 +73,7 @@ or via [PayPal](https://www.paypal.com/donate/?hosted_button_id=C6F7UJLA58MBS),
 or via [YooMoney](https://openipc.org/donation/yoomoney.html).
 
 Thank you.
+
+<a href="https://opencollective.com/openipc/contribute/backer-14335/checkout" target="_blank"><img src="https://opencollective.com/webpack/donate/button@2x.png?color=blue" width="375" alt="Open Collective donate button"></a>
+<a href="https://www.paypal.com/donate/?hosted_button_id=C6F7UJLA58MBS"><img src="https://www.paypalobjects.com/en_US/IT/i/btn/btn_donateCC_LG.gif" alt="PayPal donate button"></a>
+<a href="https://openipc.org/donation/yoomoney.html"><img src="https://yoomoney.ru/transfer/balance-informer/balance?id=596194605&key=291C29A811B500D7" width="140" alt="YooMoney donate button"></a>
