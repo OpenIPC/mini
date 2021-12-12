@@ -1,3 +1,5 @@
+![OpenIPC Logo](https://cdn.themactep.com/images/logo_openipc.png)
+
 ## Mini
 
 OpenSource Mini IP camera streamer
