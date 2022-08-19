@@ -1,0 +1,3 @@
+[submodule "glutinium"]
+	path = glutinium
+	url = https://github.com/ZigFisher/glutinium.git

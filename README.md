@@ -28,6 +28,8 @@ $ cmake -H. -Bbuild \
 $ cmake --build build
 ```
 
+Where <PATH_TO_SDK> either `glutinium/hisi-osdrv2` or `glutinium/hisi-osdrv3`
+
 ### Hardware for development
 
 We consider buying [HiSilicon 3516CV300 + Sony IMX291
