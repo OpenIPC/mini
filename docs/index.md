@@ -15,7 +15,7 @@ Please contact [IgorZalatov](mailto:flyrouter@gmail.com) to inquire further.
 | Family      | Audio | JPEG | RTSP | MD | OSD |
 | ----------- | ----- | ---- | ---- | -- | --- |
 | hi3516cv100 |   ❌  |  ❌  |  ❌  | ⁿ/ₐ | ❌ |
-| hi3518cv200 |   ❌  |  ✅  |  ✅  | ✅ |  ❌ |
+| hi3516cv200 |   ❌  |  ✅  |  ✅  | ✅ |  ❌ |
 | hi3516cv300 |   ❌  |  ✅  |  ✅  | ✅ |  ❌ |
 | hi3516ev300 |   ❌  |  ❌  |  ❌  | ❌ |  ❌ |
 
