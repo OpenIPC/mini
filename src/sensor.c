@@ -13,6 +13,9 @@
 
 int (*sensor_register_callback_fn)(void);
 int (*sensor_unregister_callback_fn)(void);
+#if HISILICON_SDK_GEN < 2
+void (*sensor_init_fn)(void);
+#endif
 void *libsns_so = NULL;
 
 int tryLoadLibrary(const char *path) {
@@ -39,8 +42,7 @@ int LoadSensorLibrary(const char *libsns_name) {
     }
 
 #if HISILICON_SDK_GEN < 2
-    void (*sensor_init_fn)(void) = dlsym(libsns_so, "sensor_init");
-    sensor_init_fn();
+    sensor_init_fn = dlsym(libsns_so, "sensor_init");
 #endif
 
     sensor_register_callback_fn = dlsym(libsns_so, "sensor_register_callback");
