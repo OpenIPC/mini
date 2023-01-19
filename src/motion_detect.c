@@ -1,5 +1,7 @@
 #include "motion_detect.h"
 
+#if HISILICON_SDK_GEN >= 2
+
 #include <ivs_md.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -455,3 +457,17 @@ HI_VOID IVE_Md_Uninit(SAMPLE_IVE_MD_S *pstMd) {
             "HI_IVS_MD_Exit failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret));
     }
 }
+
+#else // HISILICON_SDK_GEN >= 2
+
+int motion_detect_init() {
+        printf("STUB: motion detect TODO\n");
+}
+
+int motion_detect_deinit() {
+        printf("STUB: motion detect TODO\n");
+}
+
+
+#endif // else HISILICON_SDK_GEN >= 2
+

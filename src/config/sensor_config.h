@@ -3,6 +3,7 @@
 #include "config.h"
 #include "compat.h"
 
+#if HISILICON_SDK_GEN >= 2
 struct SensorMIPI {
     raw_data_type_e data_type;
     int lane_id[8];
@@ -22,6 +23,7 @@ struct SensorLVDS {
     int sync_code_num;
     int sync_code[8][16];
 };
+#endif
 
 struct SensorVIDEV {
     VI_INPUT_MODE_E input_mod;
@@ -79,7 +81,9 @@ struct SensorVIChn {
     unsigned int dest_size_height;
     VI_CAPSEL_E cap_sel;
     PIXEL_FORMAT_E pix_format;
+#if HISILICON_SDK_GEN >= 2
     COMPRESS_MODE_E compress_mode;
+#endif
     int src_frame_rate;
     int frame_rate;
 };
@@ -87,9 +91,12 @@ struct SensorVIChn {
 struct SensorConfig {
     // [sensor]
     char sensor_type[128];
+#if HISILICON_SDK_GEN >= 2
     WDR_MODE_E mode;
+#endif
     char dll_file[256];
 
+#if HISILICON_SDK_GEN >= 2
     // [mode]
     input_mode_t input_mode;
 
@@ -98,6 +105,7 @@ struct SensorConfig {
 
     // [lvds]
     struct SensorLVDS lvds;
+#endif
 
     // [isp_image]
     struct SensorISP isp;

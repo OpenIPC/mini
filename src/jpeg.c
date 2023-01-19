@@ -62,7 +62,9 @@ int32_t InitJPEG() {
         (((MAX_WIDTH + 15) >> 4) << 4) * (((MAX_HEIGHT + 15) >> 4) << 4);
     jpeg_attr.bByFrame =
         HI_TRUE; /*get stream mode is field mode  or frame mode*/
+#if HISILICON_SDK_GEN >= 2
     jpeg_attr.bSupportDCF = HI_FALSE;
+#endif
 
     VENC_CHN_ATTR_S venc_chn_attr;
     memset(&venc_chn_attr, 0, sizeof(VENC_CHN_ATTR_S));
@@ -194,7 +196,9 @@ int32_t request_pic(
         (((MAX_WIDTH + 15) >> 4) << 4) * (((MAX_HEIGHT + 15) >> 4) << 4);
     jpeg_attr.bByFrame =
         HI_TRUE; /*get stream mode is field mode  or frame mode*/
+#if HISILICON_SDK_GEN >= 2
     jpeg_attr.bSupportDCF = HI_FALSE;
+#endif
 
     VENC_CHN_ATTR_S venc_chn_attr;
     memset(&venc_chn_attr, 0, sizeof(VENC_CHN_ATTR_S));
@@ -229,14 +233,22 @@ int32_t request_pic(
         return HI_FAILURE;
     }
 
+#if HISILICON_SDK_GEN >= 2
     VENC_COLOR2GREY_S pstChnColor2Grey;
+#else
+	GROUP_COLOR2GREY_S pstChnColor2Grey;
+#endif
     if (color2Grey == 0) {
         pstChnColor2Grey.bColor2Grey = false;
     } else if (color2Grey == 1) {
         pstChnColor2Grey.bColor2Grey = true;
     } else
         pstChnColor2Grey.bColor2Grey = night_mode_is_enable();
+#if HISILICON_SDK_GEN >= 2
     s32Ret = HI_MPI_VENC_SetColor2Grey(jpeg_venc_chn, &pstChnColor2Grey);
+#else
+	s32Ret = HI_MPI_VENC_SetGrpColor2Grey(jpeg_venc_chn, &pstChnColor2Grey);
+#endif
     if (HI_SUCCESS != s32Ret) {
         printf(
             tag "HI_MPI_VENC_CreateChn(%d) failed with %#x!\n%s\n",
@@ -255,9 +267,13 @@ int32_t request_pic(
 
     HI_S32 fd = HI_MPI_VENC_GetFd(jpeg_venc_chn);
     HI_S32 stream_err = get_stream(fd, jpeg_venc_chn, jpeg_buf);
+#if HISILICON_SDK_GEN >= 2
     if (HI_MPI_VENC_CloseFd(jpeg_venc_chn) != HI_SUCCESS) {
         printf(tag "HI_MPI_VENC_CloseFd(%d) fail\n", jpeg_venc_chn);
     };
+#else
+	HI_MPI_SYS_CloseFd();
+#endif
 
     s32Ret = HI_MPI_VENC_StopRecvPic(jpeg_venc_chn);
     if (HI_SUCCESS != s32Ret) {

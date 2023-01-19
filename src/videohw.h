@@ -17,7 +17,9 @@ struct SDKState {
     VI_DEV vi_dev;
     VI_CHN vi_chn;
 
+#if HISILICON_SDK_GEN >= 2
     MD_CHN md_chn;
+#endif
 };
 extern struct SDKState state;
 

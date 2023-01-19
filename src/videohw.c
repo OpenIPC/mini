@@ -41,7 +41,7 @@ HI_S32 HI_MPI_SYS_GetChipId(HI_U32 *pu32ChipId);
 
 HI_VOID *isp_thread(HI_VOID *param) {
     ISP_DEV isp_dev = 0;
-    HI_S32 s32Ret = HI_MPI_ISP_Run(isp_dev);
+    HI_S32 s32Ret = HI_MPI_ISP_Run();
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_ISP_Run failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret));
@@ -166,10 +166,17 @@ void set_color2gray(bool color2gray) {
     pthread_mutex_lock(&mutex);
     for (int venc_chn = 0; venc_chn < VENC_MAX_CHN_NUM; venc_chn++) {
         if (VencS[venc_chn].enable) {
+#if HISILICON_SDK_GEN >= 2
             VENC_COLOR2GREY_S pstChnColor2Grey;
             pstChnColor2Grey.bColor2Grey = color2gray;
             HI_S32 s32Ret =
                 HI_MPI_VENC_SetColor2Grey(venc_chn, &pstChnColor2Grey);
+#else
+            GROUP_COLOR2GREY_S pstChnColor2Grey;
+            pstChnColor2Grey.bColor2Grey = color2gray;
+            HI_S32 s32Ret =
+                HI_MPI_VENC_SetGrpColor2Grey(venc_chn, &pstChnColor2Grey);
+#endif
         }
     }
     pthread_mutex_unlock(&mutex);
@@ -314,6 +321,7 @@ HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst) {
         "new venc: %d   vpss_grp: %d,   vpss_chn: %d\n", venc_chn, vpss_grp,
         vpss_chn);
 
+#if HISILICON_SDK_GEN >= 2
     VPSS_CHN_ATTR_S vpss_chn_attr = {
         .bSpEn = HI_FALSE,
         .bBorderEn = HI_FALSE,
@@ -330,6 +338,12 @@ HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst) {
                 .u32Color = 0,
             },
     };
+#else
+	VPSS_CHN_ATTR_S vpss_chn_attr = {
+		.bSpEn = HI_FALSE,
+		.bFrameEn = HI_FALSE
+	};
+#endif
 
     HI_S32 s32Ret = HI_MPI_VPSS_SetChnAttr(vpss_grp, vpss_chn, &vpss_chn_attr);
     if (HI_SUCCESS != s32Ret) {
@@ -345,7 +359,9 @@ HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst) {
         .u32Height = sensor_config.vichn.dest_size_height,
         .bDouble = HI_FALSE,
         .enPixelFormat = sensor_config.vichn.pix_format,
+#if HISILICON_SDK_GEN >= 2
         .enCompressMode = sensor_config.vichn.compress_mode,
+#endif
     };
     s32Ret = HI_MPI_VPSS_SetChnMode(vpss_grp, vpss_chn, &vpss_chn_mode);
     if (HI_SUCCESS != s32Ret) {
@@ -471,6 +487,22 @@ HI_S32 disable_venc_chn(VENC_CHN venc_chn) {
     set_channel_disable(venc_chn);
     return HI_SUCCESS;
 };
+
+#if HISILICON_SDK_GEN < 2
+#define VB_HEADER_STRIDE    16
+
+#define VB_PIC_HEADER_SIZE(Width, Height, Type, size)\
+    do{\
+        if (PIXEL_FORMAT_YUV_SEMIPLANAR_422 == Type || PIXEL_FORMAT_RGB_BAYER == Type )\
+        {\
+            size = VB_HEADER_STRIDE * (Height) * 2;\
+        }\
+        else if(PIXEL_FORMAT_YUV_SEMIPLANAR_420 == Type)\
+        {\
+            size = (VB_HEADER_STRIDE * (Height) * 3) >> 1;\
+        }\
+    }while(0)
+#endif
 
 int SYS_CalcPicVbBlkSize(
     unsigned int width, unsigned int height, PIXEL_FORMAT_E enPixFmt,
@@ -633,6 +665,7 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
+#if HISILICON_SDK_GEN >= 2
     s32Ret = HI_MPI_VB_SetSupplementConf(
         &(VB_SUPPLEMENT_CONF_S){.u32SupplementConf = 1});
     if (HI_SUCCESS != s32Ret) {
@@ -641,6 +674,7 @@ int start_sdk() {
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
+#endif
 
     s32Ret = HI_MPI_VB_Init();
     if (HI_SUCCESS != s32Ret) {
@@ -666,15 +700,22 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
+#if HISILICON_SDK_GEN >= 2
     s32Ret = HISDK_COMM_VI_SetMipiAttr();
     if (HI_SUCCESS != s32Ret) {
         return EXIT_FAILURE;
     }
+#endif
 
     sensor_register_callback();
 
+#if HISILICON_SDK_GEN < 2
+    s32Ret = HI_MPI_AE_Register(
+        &(ALG_LIB_S){.acLibName = "hisi_ae_lib"});
+#else
     s32Ret = HI_MPI_AE_Register(
         state.isp_dev, &(ALG_LIB_S){.acLibName = "hisi_ae_lib"});
+#endif
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_AE_Register failed with %#x!\n%s\n", s32Ret,
@@ -682,8 +723,13 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
+#if HISILICON_SDK_GEN < 2
+    s32Ret = HI_MPI_AWB_Register(
+        &(ALG_LIB_S){.acLibName = "hisi_awb_lib"});
+#else
     s32Ret = HI_MPI_AWB_Register(
         state.isp_dev, &(ALG_LIB_S){.acLibName = "hisi_awb_lib"});
+#endif
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_AWB_Register failed with %#x!\n%s\n", s32Ret,
@@ -691,8 +737,13 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
+#if HISILICON_SDK_GEN < 2
+    s32Ret = HI_MPI_AF_Register(
+        &(ALG_LIB_S){.acLibName = "hisi_af_lib"});
+#else
     s32Ret = HI_MPI_AF_Register(
         state.isp_dev, &(ALG_LIB_S){.acLibName = "hisi_af_lib"});
+#endif
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_AF_Register failed with %#x!\n%s\n", s32Ret,
@@ -700,6 +751,7 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
+#if HISILICON_SDK_GEN >= 2
     s32Ret = HI_MPI_ISP_MemInit(state.isp_dev);
     if (HI_SUCCESS != s32Ret) {
         printf(
@@ -707,6 +759,7 @@ int start_sdk() {
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
+#endif
 
     HI_U32 chipId;
     s32Ret = HI_MPI_SYS_GetChipId(&chipId);
@@ -728,6 +781,7 @@ int start_sdk() {
         }
     }
 
+#if HISILICON_SDK_GEN >= 2
     s32Ret = HI_MPI_ISP_SetWDRMode(
         state.isp_dev, &(ISP_WDR_MODE_S){.enWDRMode = sensor_config.mode});
     if (HI_SUCCESS != s32Ret) {
@@ -736,7 +790,23 @@ int start_sdk() {
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
+#endif
 
+#if HISILICON_SDK_GEN < 2
+    s32Ret = HI_MPI_ISP_SetImageAttr(
+        &(ISP_IMAGE_ATTR_S){
+            .u16Width = sensor_config.isp.isp_w,
+            .u16Height = sensor_config.isp.isp_h,
+            .u16FrameRate = sensor_config.isp.isp_frame_rate,
+            .enBayer = sensor_config.isp.isp_bayer,
+        });
+    if (HI_SUCCESS != s32Ret) {
+        printf(
+            "HI_MPI_ISP_SetImageAttr failed with %#x!\n%s\n", s32Ret,
+            hi_errstr(s32Ret));
+        return EXIT_FAILURE;
+    }
+#else
     s32Ret = HI_MPI_ISP_SetPubAttr(
         state.isp_dev, &(ISP_PUB_ATTR_S){
                            .stWndRect =
@@ -755,8 +825,13 @@ int start_sdk() {
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
+#endif
 
+#if HISILICON_SDK_GEN < 2
+    s32Ret = HI_MPI_ISP_Init();
+#else
     s32Ret = HI_MPI_ISP_Init(state.isp_dev);
+#endif
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_ISP_Init failed with %#x!\n%s\n", s32Ret,
@@ -825,6 +900,7 @@ int start_sdk() {
         .enDataPath = sensor_config.videv.data_path,
         .enInputDataType = sensor_config.videv.input_data_type,
         .bDataRev = sensor_config.videv.data_rev,
+#if HISILICON_SDK_GEN >= 2
         .stDevRect =
             {
                 .s32X = sensor_config.videv.dev_rect_x,
@@ -832,6 +908,7 @@ int start_sdk() {
                 .u32Width = sensor_config.videv.dev_rect_w,
                 .u32Height = sensor_config.videv.dev_rect_h,
             },
+#endif
     };
 
     s32Ret = HI_MPI_VI_SetDevAttr(state.vi_dev, &vi_dev_attr);
@@ -842,6 +919,7 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
+#if HISILICON_SDK_GEN >= 2
     VI_WDR_ATTR_S wdr_addr = {
         .enWDRMode = WDR_MODE_NONE,
         .bCompress = HI_FALSE,
@@ -853,6 +931,7 @@ int start_sdk() {
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
+#endif
 
     s32Ret = HI_MPI_VI_EnableDev(state.vi_dev);
     if (HI_SUCCESS != s32Ret) {
@@ -881,8 +960,13 @@ int start_sdk() {
         .bMirror = HI_FALSE,
         .bFlip = HI_FALSE,
         .s32SrcFrameRate = -1,
+#if HISILICON_SDK_GEN < 2
+        .bChromaResample = HI_FALSE,
+        .s32FrameRate = -1,
+#else
         .s32DstFrameRate = -1,
         .enCompressMode = sensor_config.vichn.compress_mode,
+#endif
     };
     s32Ret = HI_MPI_VI_SetChnAttr(state.vi_chn, &chn_attr);
     if (HI_SUCCESS != s32Ret) {
@@ -900,6 +984,7 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
+#if HISILICON_SDK_GEN >= 2
     HI_U32 mode;
     s32Ret = HI_MPI_SYS_GetViVpssMode(&mode);
     if (HI_SUCCESS != s32Ret) {
@@ -910,6 +995,8 @@ int start_sdk() {
     }
     bool online_mode = mode == 1;
     printf("SDK is in '%s' mode\n", online_mode ? "online" : "offline");
+#else
+#endif
 
     {
         VPSS_GRP vpss_grp = 0;
@@ -917,11 +1004,16 @@ int start_sdk() {
             .u32MaxW = sensor_config.vichn.dest_size_width,
             .u32MaxH = sensor_config.vichn.dest_size_height,
             .enPixFmt = sensor_config.vichn.pix_format,
-            .bIeEn = HI_FALSE,
-            .bDciEn = HI_FALSE,
-            .bNrEn = HI_TRUE,
-            .bHistEn = HI_FALSE,
-            .enDieMode = VPSS_DIE_MODE_NODIE,
+            .bIeEn = HI_FALSE,                      // Image enhance enable
+#if HISILICON_SDK_GEN < 2
+            .bDrEn = HI_FALSE,
+            .bDbEn = HI_FALSE,
+#else
+            .bDciEn = HI_FALSE,                     // Dynamic contrast Improve enable
+#endif
+            .bNrEn = HI_TRUE,                       // Noise reduce enable
+            .bHistEn = HI_FALSE,                    // Hist enable
+            .enDieMode = VPSS_DIE_MODE_NODIE,       // De-interlace enable
         };
         s32Ret = HI_MPI_VPSS_CreateGrp(vpss_grp, &vpss_grp_attr);
         if (HI_SUCCESS != s32Ret) {
@@ -991,7 +1083,7 @@ int start_sdk() {
                                 0, /*0: baseline; 1:MP; 2:HP;  3:svc_t */
                             .bByFrame = HI_TRUE, /*get stream mode is slice mode
                                                     or frame mode?*/
-#if HISILICON_SDK_GEN <= 2
+#if HISILICON_SDK_GEN == 2
                             .u32RefNum =
                                 1, /* 0: default; number of reference frames*/
 #endif
@@ -1004,10 +1096,17 @@ int start_sdk() {
                         {
                             .u32Gop = app_config.mp4_fps,
                             .u32StatTime = 1, /* stream rate statics time(s) */
+#if HISILICON_SDK_GEN < 2
+                            .u32ViFrmRate =
+                                app_config.mp4_fps,
+                            .fr32TargetFrmRate =
+                                app_config.mp4_fps, /* target frame rate */
+#else
                             .u32SrcFrmRate =
                                 app_config.mp4_fps, /* input (vi) frame rate */
                             .fr32DstFrmRate =
                                 app_config.mp4_fps, /* target frame rate */
+#endif
                             .u32BitRate = app_config.mp4_bitrate,
                             .u32FluctuateLevel = 1,
                         },
@@ -1068,8 +1167,13 @@ int start_sdk() {
                     .stAttrMjpegeCbr =
                         {
                             .u32StatTime = 1,
+#if HISILICON_SDK_GEN < 2
+                            .u32ViFrmRate = app_config.mjpeg_fps,
+                            .fr32TargetFrmRate = app_config.mjpeg_fps,
+#else
                             .u32SrcFrmRate = app_config.mjpeg_fps,
                             .fr32DstFrmRate = app_config.mjpeg_fps,
+#endif
                             .u32BitRate = app_config.mjpeg_bitrate,
                             .u32FluctuateLevel = 1,
                         },
@@ -1188,7 +1292,11 @@ int stop_sdk() {
         return EXIT_FAILURE;
     }
 
+#if HISILICON_SDK_GEN >= 2
     s32Ret = HI_MPI_ISP_Exit(state.isp_dev);
+#else
+    s32Ret = HI_MPI_ISP_Exit();
+#endif
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_ISP_Exit failed with %#x!\n%s\n", s32Ret,
@@ -1197,8 +1305,13 @@ int stop_sdk() {
     }
     pthread_join(gs_IspPid, NULL);
 
+#if HISILICON_SDK_GEN >= 2
     s32Ret = HI_MPI_AF_UnRegister(
         state.isp_dev, &(ALG_LIB_S){.acLibName = "hisi_af_lib"});
+#else
+    s32Ret = HI_MPI_AF_UnRegister(
+        &(ALG_LIB_S){.acLibName = "hisi_af_lib"});
+#endif
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_AF_UnRegister failed with %#x!\n%s\n", s32Ret,
@@ -1206,8 +1319,13 @@ int stop_sdk() {
         return EXIT_FAILURE;
     }
 
+#if HISILICON_SDK_GEN >= 2
     s32Ret = HI_MPI_AWB_UnRegister(
         state.isp_dev, &(ALG_LIB_S){.acLibName = "hisi_awb_lib"});
+#else
+    s32Ret = HI_MPI_AWB_UnRegister(
+        &(ALG_LIB_S){.acLibName = "hisi_awb_lib"});
+#endif
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_AWB_UnRegister failed with %#x!\n%s\n", s32Ret,
@@ -1215,8 +1333,13 @@ int stop_sdk() {
         return EXIT_FAILURE;
     }
 
+#if HISILICON_SDK_GEN >= 2
     s32Ret = HI_MPI_AE_UnRegister(
         state.isp_dev, &(ALG_LIB_S){.acLibName = "hisi_ae_lib"});
+#else
+    s32Ret = HI_MPI_AE_UnRegister(
+        &(ALG_LIB_S){.acLibName = "hisi_ae_lib"});
+#endif
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_AE_UnRegister failed with %#x!\n%s\n", s32Ret,

@@ -71,6 +71,6 @@ target_link_libraries(${PROJECT_NAME}
     ${HILIBS}
     ${VENDOR_SDK_LIBRARIES}
     Threads::Threads
-    dl)
+    dl gcc_s)
 
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION /usr/bin)

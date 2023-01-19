@@ -37,6 +37,7 @@ enum ConfigError read_sensor_from_proc_cmdline(char *sensor_type) {
     return CONFIG_OK;
 }
 
+#if HISILICON_SDK_GEN >= 2
 enum ConfigError parse_config_lvds(
     struct IniConfig *ini, const char *section, struct SensorLVDS *lvds) {
     enum ConfigError err;
@@ -120,6 +121,7 @@ enum ConfigError parse_config_lvds(
     }
     return CONFIG_OK;
 }
+#endif
 
 enum ConfigError parse_config_videv(
     struct IniConfig *ini, const char *section, struct SensorVIDEV *videv) {
@@ -452,6 +454,7 @@ int parse_config_vichn(
         if (err != CONFIG_OK)
             return err;
     }
+#if HISILICON_SDK_GEN >= 2
     {
         const char *possible_values[] = {
             "COMPRESS_MODE_NONE", "COMPRESS_MODE_SEG", "COMPRESS_MODE_SEG128",
@@ -463,6 +466,7 @@ int parse_config_vichn(
         if (err != CONFIG_OK)
             return err;
     }
+#endif
     err = parse_int(
         ini, section, "SrcFrameRate", INT_MIN, INT_MAX, &vichn->src_frame_rate);
     if (err != CONFIG_OK)
@@ -550,6 +554,7 @@ enum ConfigError parse_sensor_config(char *path, struct SensorConfig *config) {
     err = parse_param_value(&ini, "sensor", "sensor_type", config->sensor_type);
     if (err != CONFIG_OK)
         goto RET_ERR;
+#if HISILICON_SDK_GEN >= 2
     {
         const char *possible_values[] = {
             "WDR_MODE_NONE",
@@ -570,11 +575,13 @@ enum ConfigError parse_sensor_config(char *path, struct SensorConfig *config) {
         if (err != CONFIG_OK)
             goto RET_ERR;
     }
+#endif
     err = parse_param_value(&ini, "sensor", "DllFile", config->dll_file);
     if (err != CONFIG_OK)
         goto RET_ERR;
 
     // [mode]
+#if HISILICON_SDK_GEN >= 2
     {
         const char *possible_values[] = {
             "INPUT_MODE_MIPI",   "INPUT_MODE_SUBLVDS",  "INPUT_MODE_LVDS",
@@ -611,6 +618,7 @@ enum ConfigError parse_sensor_config(char *path, struct SensorConfig *config) {
         if (err != CONFIG_OK)
             goto RET_ERR;
     }
+#endif
 
     // [isp_image]
     err = parse_config_isp(&ini, "ips_image", &config->isp);
