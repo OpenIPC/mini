@@ -629,9 +629,10 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
+    LoadSensorLibrary(sensor_config.dll_file);
+
     HI_MPI_SYS_Exit();
     HI_MPI_VB_Exit();
-    LoadSensorLibrary(sensor_config.dll_file);
 
     unsigned int width = sensor_config.isp.isp_w;
     unsigned int height = sensor_config.isp.isp_h;
@@ -683,8 +684,9 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 
-    s32Ret =
-        HI_MPI_SYS_SetConf(&(MPP_SYS_CONF_S){.u32AlignWidth = u32AlignWidth});
+    MPP_SYS_CONF_S stSysConf = {0};
+    stSysConf.u32AlignWidth = u32AlignWidth;
+    s32Ret = HI_MPI_SYS_SetConf(&stSysConf);
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_SYS_SetConf failed with %#x!\n%s\n", s32Ret,
@@ -705,9 +707,19 @@ int start_sdk() {
     if (HI_SUCCESS != s32Ret) {
         return EXIT_FAILURE;
     }
+#else
+    printf("PRE sensor_init()\n");
+    sensor_init_fn();
+    printf("POST sensor_init()\n");
 #endif
 
-    sensor_register_callback();
+    s32Ret = sensor_register_callback();
+    if (HI_SUCCESS != s32Ret) {
+        printf(
+            "sensor_register_callback failedwith %#x!\n%s\n", s32Ret,
+            hi_errstr(s32Ret));
+        return EXIT_FAILURE;
+    }
 
 #if HISILICON_SDK_GEN < 2
     s32Ret = HI_MPI_AE_Register(
@@ -791,6 +803,18 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 #endif
+printf("PRE HI_MPI_ISP_Init\n");
+
+    s32Ret = HI_MPI_ISP_Init();
+    if (s32Ret != HI_SUCCESS)
+    {
+        printf("%s: HI_MPI_ISP_Init failed!\n", __FUNCTION__);
+        printf(
+            "HI_MPI_ISP_Init failed with %#x!\n%s\n", s32Ret,
+            hi_errstr(s32Ret));
+        return EXIT_FAILURE;
+    }
+
 
 #if HISILICON_SDK_GEN < 2
     printf("going to set w %d, h %d, f/r %d, bayer %d\n", sensor_config.isp.isp_w, sensor_config.isp.isp_h, sensor_config.isp.isp_frame_rate, sensor_config.isp.isp_bayer);
