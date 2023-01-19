@@ -1393,7 +1393,7 @@ int stop_sdk() {
     return EXIT_SUCCESS;
 }
 
-#if HISILICON_SDK_GEN == 3
+#if ((HISILICON_SDK_GEN == 3) || (HISILICON_SDK_GEN == 1))
 #define BROKEN_MMAP
 #include "mmap.h"
 
