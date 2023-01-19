@@ -628,14 +628,14 @@ int start_sdk() {
         printf("Can't load config\n");
         return EXIT_FAILURE;
     }
+
+    HI_MPI_SYS_Exit();
+    HI_MPI_VB_Exit();
     LoadSensorLibrary(sensor_config.dll_file);
 
     unsigned int width = sensor_config.isp.isp_w;
     unsigned int height = sensor_config.isp.isp_h;
     unsigned int frame_rate = sensor_config.isp.isp_frame_rate;
-
-    HI_MPI_SYS_Exit();
-    HI_MPI_VB_Exit();
 
     int u32AlignWidth = app_config.align_width;
     printf("u32AlignWidth: %d\n", app_config.align_width);
@@ -793,6 +793,7 @@ int start_sdk() {
 #endif
 
 #if HISILICON_SDK_GEN < 2
+    printf("going to set w %d, h %d, f/r %d, bayer %d\n", sensor_config.isp.isp_w, sensor_config.isp.isp_h, sensor_config.isp.isp_frame_rate, sensor_config.isp.isp_bayer);
     s32Ret = HI_MPI_ISP_SetImageAttr(
         &(ISP_IMAGE_ATTR_S){
             .u16Width = sensor_config.isp.isp_w,

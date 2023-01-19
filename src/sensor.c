@@ -37,6 +37,12 @@ int LoadSensorLibrary(const char *libsns_name) {
             }
         }
     }
+
+#if HISILICON_SDK_GEN < 2
+    void (*sensor_init_fn)(void) = dlsym(libsns_so, "sensor_init");
+    sensor_init_fn();
+#endif
+
     sensor_register_callback_fn = dlsym(libsns_so, "sensor_register_callback");
     sensor_unregister_callback_fn =
         dlsym(libsns_so, "sensor_unregister_callback");
