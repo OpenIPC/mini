@@ -5,3 +5,4 @@ compile_commands.json
 lib
 output
 rebuild*
+build*
