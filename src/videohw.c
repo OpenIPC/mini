@@ -803,7 +803,6 @@ int start_sdk() {
         return EXIT_FAILURE;
     }
 #endif
-printf("PRE HI_MPI_ISP_Init\n");
 
     s32Ret = HI_MPI_ISP_Init();
     if (s32Ret != HI_SUCCESS)
@@ -828,6 +827,19 @@ printf("PRE HI_MPI_ISP_Init\n");
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_ISP_SetImageAttr failed with %#x!\n%s\n", s32Ret,
+            hi_errstr(s32Ret));
+        return EXIT_FAILURE;
+    }
+    ISP_INPUT_TIMING_S stInputTiming;
+    stInputTiming.u16HorWndStart = sensor_config.isp.isp_x;
+    stInputTiming.u16HorWndLength = sensor_config.isp.isp_w;
+    stInputTiming.u16VerWndStart = sensor_config.isp.isp_y;
+    stInputTiming.u16VerWndLength = sensor_config.isp.isp_h;
+    stInputTiming.enWndMode = ISP_WIND_ALL;
+    s32Ret = HI_MPI_ISP_SetInputTiming(&stInputTiming);
+    if (HI_SUCCESS != s32Ret) {
+        printf(
+            "HI_MPI_ISP_SetInputTiming failed with %#x!\n%s\n", s32Ret,
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
@@ -943,6 +955,7 @@ printf("PRE HI_MPI_ISP_Init\n");
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
+printf("After HI_MPI_VI_SetDevAttr\n");
 
 #if HISILICON_SDK_GEN >= 2
     VI_WDR_ATTR_S wdr_addr = {
