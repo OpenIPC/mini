@@ -1321,28 +1321,28 @@ printf("After HI_MPI_VI_SetDevAttr\n");
             printf("Init_JPEG() failed with %#x!\n", s32Ret);
             return EXIT_FAILURE;
         }
+    }
 
-        {
-            pthread_attr_t thread_attr;
-            pthread_attr_init(&thread_attr);
-            size_t stacksize;
-            pthread_attr_getstacksize(&thread_attr, &stacksize);
-            size_t new_stacksize = app_config.venc_stream_thread_stack_size;
-            if (pthread_attr_setstacksize(&thread_attr, new_stacksize)) {
-                printf("Error:  Can't set stack size %zu\n", new_stacksize);
-            }
-            if (0 != pthread_create(
-                         &gs_VencPid, &thread_attr, VENC_GetVencStreamProc, NULL)) {
-                printf(
-                    "%s: create VENC_GetVencStreamProc running thread failed!\n",
-                    __FUNCTION__);
-                return EXIT_FAILURE;
-            }
-            if (pthread_attr_setstacksize(&thread_attr, stacksize)) {
-                printf("Error:  Can't set stack size %zu\n", stacksize);
-            }
-            pthread_attr_destroy(&thread_attr);
+    {
+        pthread_attr_t thread_attr;
+        pthread_attr_init(&thread_attr);
+        size_t stacksize;
+        pthread_attr_getstacksize(&thread_attr, &stacksize);
+        size_t new_stacksize = app_config.venc_stream_thread_stack_size;
+        if (pthread_attr_setstacksize(&thread_attr, new_stacksize)) {
+            printf("Error:  Can't set stack size %zu\n", new_stacksize);
         }
+        if (0 != pthread_create(
+                     &gs_VencPid, &thread_attr, VENC_GetVencStreamProc, NULL)) {
+            printf(
+                "%s: create VENC_GetVencStreamProc running thread failed!\n",
+                __FUNCTION__);
+            return EXIT_FAILURE;
+        }
+        if (pthread_attr_setstacksize(&thread_attr, stacksize)) {
+            printf("Error:  Can't set stack size %zu\n", stacksize);
+        }
+        pthread_attr_destroy(&thread_attr);
     }
 
     printf("Start sdk Ok!\n");
