@@ -363,6 +363,8 @@ HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst) {
         .enCompressMode = sensor_config.vichn.compress_mode,
 #endif
     };
+
+#if HISILICON_SDK_GEN >= 2
     s32Ret = HI_MPI_VPSS_SetChnMode(vpss_grp, vpss_chn, &vpss_chn_mode);
     if (HI_SUCCESS != s32Ret) {
         printf(
@@ -370,6 +372,9 @@ HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst) {
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
+#else
+    // s32Ret = HI_MPI_VPSS_SetChnMode(vpss_grp, vpss_chn, &vpss_chn_mode);
+#endif
 
     s32Ret = HI_MPI_VPSS_EnableChn(vpss_grp, vpss_chn);
     if (HI_SUCCESS != s32Ret) {
@@ -379,17 +384,14 @@ HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst) {
         return EXIT_FAILURE;
     }
 
+#if HISILICON_SDK_GEN >= 2
     MPP_CHN_S src_chn = {
         .enModId = HI_ID_VPSS,
         .s32DevId = vpss_grp,
         .s32ChnId = vpss_chn,
     };
     MPP_CHN_S dest_chn = {
-#if HISILICON_SDK_GEN < 2
-        .enModId = HI_ID_GROUP,
-#else
         .enModId = HI_ID_VENC,
-#endif
         .s32DevId = 0,
         .s32ChnId = venc_chn,
     };
@@ -401,6 +403,7 @@ HI_S32 create_venc_chn(VENC_CHN venc_chn, uint32_t fps_src, uint32_t fps_dst) {
             hi_errstr(s32Ret));
         return HI_FAILURE;
     }
+#endif
     return HI_SUCCESS;
 }
 
@@ -648,6 +651,7 @@ int start_sdk() {
 
     int u32BlkSize = SYS_CalcPicVbBlkSize(
         width, height, sensor_config.vichn.pix_format, u32AlignWidth);
+    // TODO: maybe all channels need init
     VB_CONF_S vb_conf = {
         .u32MaxPoolCnt = app_config.max_pool_cnt,
         .astCommPool =
@@ -809,6 +813,7 @@ int start_sdk() {
     }
 #endif
 
+#if HISILICON_SDK_GEN < 2
     s32Ret = HI_MPI_ISP_Init();
     if (s32Ret != HI_SUCCESS)
     {
@@ -818,10 +823,14 @@ int start_sdk() {
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
+#else
+#endif
 
+
+
+    printf("going to set w %d, h %d, f/r %d, bayer %d\n", sensor_config.isp.isp_w, sensor_config.isp.isp_h, sensor_config.isp.isp_frame_rate, sensor_config.isp.isp_bayer);
 
 #if HISILICON_SDK_GEN < 2
-    printf("going to set w %d, h %d, f/r %d, bayer %d\n", sensor_config.isp.isp_w, sensor_config.isp.isp_h, sensor_config.isp.isp_frame_rate, sensor_config.isp.isp_bayer);
     s32Ret = HI_MPI_ISP_SetImageAttr(
         &(ISP_IMAGE_ATTR_S){
             .u16Width = sensor_config.isp.isp_w,
@@ -835,6 +844,9 @@ int start_sdk() {
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
+
+    printf("%s: HI_MPI_ISP_SetImageAttr success!\n", __FUNCTION__);
+
     ISP_INPUT_TIMING_S stInputTiming;
     stInputTiming.u16HorWndStart = sensor_config.isp.isp_x;
     stInputTiming.u16HorWndLength = sensor_config.isp.isp_w;
@@ -869,18 +881,33 @@ int start_sdk() {
     }
 #endif
 
-#if HISILICON_SDK_GEN < 2
-    s32Ret = HI_MPI_ISP_Init();
+#if HISILICON_SDK_GEN < 2///==========
+    // s32Ret = HI_MPI_ISP_Init();
+    // if (s32Ret != HI_SUCCESS)
+    // {
+    //     printf("%s: HI_MPI_ISP_Init failed!\n", __FUNCTION__);
+    //     printf(
+    //         "HI_MPI_ISP_Init failed with %#x!\n%s\n", s32Ret,
+    //         hi_errstr(s32Ret));
+    //     return EXIT_FAILURE;
+    // }
 #else
     s32Ret = HI_MPI_ISP_Init(state.isp_dev);
-#endif
     if (HI_SUCCESS != s32Ret) {
         printf(
             "HI_MPI_ISP_Init failed with %#x!\n%s\n", s32Ret,
             hi_errstr(s32Ret));
         return EXIT_FAILURE;
     }
+#endif
 
+#if 1
+    if (0 != pthread_create(&gs_IspPid, 0, (void* (*)(void*))isp_thread, NULL))
+    {
+        printf("%s: create isp running thread failed!\n", __FUNCTION__);
+        return HI_FAILURE;
+    }
+#else
     {
         pthread_attr_t thread_attr;
         pthread_attr_init(&thread_attr);
@@ -901,6 +928,8 @@ int start_sdk() {
         }
         pthread_attr_destroy(&thread_attr);
     }
+#endif
+
     usleep(1000);
 
     state.vi_dev = 0;
@@ -1002,10 +1031,10 @@ printf("After HI_MPI_VI_SetDevAttr\n");
         .enPixFormat = sensor_config.vichn.pix_format,
         .bMirror = HI_FALSE,
         .bFlip = HI_FALSE,
-        .s32SrcFrameRate = -1,
+        .s32SrcFrameRate = -1,  // TODO: check for 30
 #if HISILICON_SDK_GEN < 2
         .bChromaResample = HI_FALSE,
-        .s32FrameRate = -1,
+        .s32FrameRate = -1,     // TODO: check for 30
 #else
         .s32DstFrameRate = -1,
         .enCompressMode = sensor_config.vichn.compress_mode,
@@ -1048,11 +1077,11 @@ printf("After HI_MPI_VI_SetDevAttr\n");
             .u32MaxH = sensor_config.vichn.dest_size_height,
             .enPixFmt = sensor_config.vichn.pix_format,
 #if HISILICON_SDK_GEN < 2
-            .bIeEn = HI_TRUE,                       // Image enhance enable
+            .bIeEn = HI_FALSE,                      // Image enhance enable
             .bDrEn = HI_FALSE,
             .bDbEn = HI_FALSE,
-            .bHistEn = HI_TRUE,                     // Hist enable
-            .enDieMode = VPSS_DIE_MODE_AUTO,        // De-interlace enable
+            .bHistEn = HI_FALSE,                    // Hist enable
+            .enDieMode = VPSS_DIE_MODE_NODIE,        // De-interlace enable
 #else
             .bIeEn = HI_FALSE,                      // Image enhance enable
             .bDciEn = HI_FALSE,                     // Dynamic contrast Improve enable
@@ -1085,6 +1114,9 @@ printf("After HI_MPI_VI_SetDevAttr\n");
         }
 
         stVpssParam.u32MotionThresh = 0;
+        stVpssParam.u32SfStrength = 128;
+        stVpssParam.u32TfStrength = 32;
+        stVpssParam.u32ChromaRange = 32;
 
         s32Ret = HI_MPI_VPSS_SetGrpParam(vpss_grp, &stVpssParam);
         if (HI_SUCCESS != s32Ret) {
@@ -1104,6 +1136,7 @@ printf("After HI_MPI_VI_SetDevAttr\n");
         }
 
         {
+            printf("VPSS bind start\n");
             MPP_CHN_S src_chn = {
 #if HISILICON_SDK_GEN < 2
                 .enModId = HI_ID_VIU,
@@ -1111,7 +1144,7 @@ printf("After HI_MPI_VI_SetDevAttr\n");
                 .enModId = HI_ID_VPSS,
 #endif
                 .s32DevId = 0,
-                .s32ChnId = 0,
+                .s32ChnId = 0,  // ViChn
             };
             MPP_CHN_S dest_chn = {
 #if HISILICON_SDK_GEN < 2
@@ -1129,14 +1162,25 @@ printf("After HI_MPI_VI_SetDevAttr\n");
                     hi_errstr(s32Ret));
                 return EXIT_FAILURE;
             }
+            printf("VPSS bind done\n");
         }
     }
 
     // config venc
     if (app_config.mp4_enable) {
+        printf("mp4 enabled\n");
         VENC_CHN venc_chn = take_next_free_channel(true);
 
         VENC_GRP VencGrp = 0;
+
+        s32Ret = create_venc_chn(
+            venc_chn, sensor_config.isp.isp_frame_rate, app_config.mp4_fps);
+        if (HI_SUCCESS != s32Ret) {
+            printf(
+                "create_vpss_chn failed with %#x!\n%s\n", s32Ret,
+                hi_errstr(s32Ret));
+            return EXIT_FAILURE;
+        }
 
 #if HISILICON_SDK_GEN < 2
         s32Ret = HI_MPI_VENC_CreateGroup(VencGrp);
@@ -1147,15 +1191,6 @@ printf("After HI_MPI_VI_SetDevAttr\n");
             return HI_FAILURE;
         }
 #endif
-
-        s32Ret = create_venc_chn(
-            venc_chn, sensor_config.isp.isp_frame_rate, app_config.mp4_fps);
-        if (HI_SUCCESS != s32Ret) {
-            printf(
-                "create_vpss_chn failed with %#x!\n%s\n", s32Ret,
-                hi_errstr(s32Ret));
-            return EXIT_FAILURE;
-        }
 
         unsigned int width = app_config.mp4_width;
         unsigned int height = app_config.mp4_height;
@@ -1173,7 +1208,7 @@ printf("After HI_MPI_VI_SetDevAttr\n");
 #if HISILICON_SDK_GEN < 2
                             .u32BufSize = width * height * 2, /*stream buffer size*/
                             .u32Profile =
-                                1, /*0: baseline; 1:MP; 2:HP;  3:svc_t */
+                                0, /*0: baseline; 1:MP; 2:HP;  3:svc_t */
                             .bField = HI_FALSE,           /* surpport frame code only for hi3516, bfield = HI_FALSE */
                             .bMainStream = HI_TRUE,       /* surpport main stream only for hi3516, bMainStream = HI_TRUE */
                             .u32Priority = 0,             /*channels precedence level. invalidate for hi3516*/
@@ -1248,8 +1283,46 @@ printf("After HI_MPI_VI_SetDevAttr\n");
         }
     }
 
+#if HISILICON_SDK_GEN < 2
+    VPSS_GRP vpss_grp = 0;
+    VENC_GRP VencGrp = 0;
+
+    MPP_CHN_S stSrcChn;
+    MPP_CHN_S stDestChn;
+
+    stSrcChn.enModId = HI_ID_VPSS;
+    stSrcChn.s32DevId = vpss_grp;
+    stSrcChn.s32ChnId = 0;
+
+    stDestChn.enModId = HI_ID_GROUP;
+    stDestChn.s32DevId = VencGrp;
+    stDestChn.s32ChnId = 0;
+
+    s32Ret = HI_MPI_SYS_Bind(&stSrcChn, &stDestChn);
+    if (s32Ret != HI_SUCCESS)
+    {
+        printf(
+                "HI_MPI_SYS_Bind failed with %#x!\n%s\n", s32Ret,
+                hi_errstr(s32Ret));
+        return HI_FAILURE;
+    }
+#endif
+
     if (app_config.mjpeg_enable) {
         VENC_CHN venc_chn = take_next_free_channel(true);
+        printf("take_next_free_channel %d!\n", venc_chn);
+
+        VENC_GRP VencGrp = venc_chn;
+
+#if HISILICON_SDK_GEN < 2
+        s32Ret = HI_MPI_VENC_CreateGroup(VencGrp);
+        if (HI_SUCCESS != s32Ret) {
+            printf(
+                "HI_MPI_VENC_CreateGroup[%d] failed with %#x!\n%s\n", VencGrp, s32Ret,
+                hi_errstr(s32Ret));
+            return HI_FAILURE;
+        }
+#endif
 
         s32Ret = create_venc_chn(
             venc_chn, sensor_config.isp.isp_frame_rate, app_config.mjpeg_fps);
@@ -1273,8 +1346,15 @@ printf("After HI_MPI_VI_SetDevAttr\n");
                             .u32MaxPicHeight = height,
                             .u32PicWidth = width,
                             .u32PicHeight = height,
+#if HISILICON_SDK_GEN < 2
+                            .u32BufSize = width * height * 2,   /*stream buffer size*/
+                            .bMainStream = HI_TRUE,             /*main stream or minor stream types?*/
+                            .bVIField = HI_FALSE,               /*the sign of the VI picture is field or frame?*/
+                            .u32Priority = 0,                   /*channels precedence level*/
+#else
                             .u32BufSize = (((width + 15) >> 4) << 4) *
                                           (((height + 15) >> 4) << 4),
+#endif
                             .bByFrame = HI_TRUE, // use full frames
                         },
 
@@ -1288,12 +1368,13 @@ printf("After HI_MPI_VI_SetDevAttr\n");
 #if HISILICON_SDK_GEN < 2
                             .u32ViFrmRate = app_config.mjpeg_fps,
                             .fr32TargetFrmRate = app_config.mjpeg_fps,
+                            .u32FluctuateLevel = 0,
 #else
                             .u32SrcFrmRate = app_config.mjpeg_fps,
                             .fr32DstFrmRate = app_config.mjpeg_fps,
+                            .u32FluctuateLevel = 1,
 #endif
                             .u32BitRate = app_config.mjpeg_bitrate,
-                            .u32FluctuateLevel = 1,
                         },
                 },
         };
@@ -1306,6 +1387,16 @@ printf("After HI_MPI_VI_SetDevAttr\n");
             return EXIT_FAILURE;
         }
 
+#if HISILICON_SDK_GEN < 2
+        s32Ret = HI_MPI_VENC_RegisterChn(VencGrp, venc_chn);
+        if (HI_SUCCESS != s32Ret) {
+            printf(
+                "HI_MPI_VENC_RegisterChn failed with %#x!\n%s\n", s32Ret,
+                hi_errstr(s32Ret));
+            return HI_FAILURE;
+        }
+#endif
+
         s32Ret = HI_MPI_VENC_StartRecvPic(venc_chn);
         if (HI_SUCCESS != s32Ret) {
             printf(
@@ -1316,6 +1407,7 @@ printf("After HI_MPI_VI_SetDevAttr\n");
     }
 
     if (app_config.jpeg_enable) {
+        printf("jpeg enabled\n");
         s32Ret = InitJPEG();
         if (HI_SUCCESS != s32Ret) {
             printf("Init_JPEG() failed with %#x!\n", s32Ret);
@@ -1323,6 +1415,7 @@ printf("After HI_MPI_VI_SetDevAttr\n");
         }
     }
 
+#if 1
     {
         pthread_attr_t thread_attr;
         pthread_attr_init(&thread_attr);
@@ -1344,7 +1437,10 @@ printf("After HI_MPI_VI_SetDevAttr\n");
         }
         pthread_attr_destroy(&thread_attr);
     }
+#else
 
+    pthread_create(&gs_VencPid, 0, VENC_GetVencStreamProc, NULL);
+#endif
     printf("Start sdk Ok!\n");
     return EXIT_SUCCESS;
 }
