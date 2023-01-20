@@ -1206,7 +1206,7 @@ printf("After HI_MPI_VI_SetDevAttr\n");
                             .u32PicWidth = width,         /*the picture width*/
                             .u32PicHeight = height,       /*the picture height*/
 #if HISILICON_SDK_GEN < 2
-                            .u32BufSize = width * height * 2, /*stream buffer size*/
+                            .u32BufSize = width * height, // * 2, /*stream buffer size*/
                             .u32Profile =
                                 0, /*0: baseline; 1:MP; 2:HP;  3:svc_t */
                             .bField = HI_FALSE,           /* surpport frame code only for hi3516, bfield = HI_FALSE */
@@ -1347,7 +1347,9 @@ printf("After HI_MPI_VI_SetDevAttr\n");
                             .u32PicWidth = width,
                             .u32PicHeight = height,
 #if HISILICON_SDK_GEN < 2
-                            .u32BufSize = width * height * 2,   /*stream buffer size*/
+                            .u32BufSize = (((width + 15) >> 4) << 4) *
+                                          (((height + 15) >> 4) << 4),
+                            // .u32BufSize = width * height * 2,   /*stream buffer size*/
                             .bMainStream = HI_TRUE,             /*main stream or minor stream types?*/
                             .bVIField = HI_FALSE,               /*the sign of the VI picture is field or frame?*/
                             .u32Priority = 0,                   /*channels precedence level*/
