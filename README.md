@@ -1,26 +1,45 @@
-![OpenIPC Logo](https://cdn.themactep.com/images/logo_openipc.png)
+Mini Video Streamer
+===================
+__A part of [OpenIPC Project](https://openipc.org/)__
 
-## Mini
+```diff
+@@ This project needs developers! Please contact Igor Zalatov <flyrouter@gmail.com>. @@
+```
 
-OpenSource Mini IP camera streamer
+## Description
+Mini is an open source video streaming software for HiSilicon IP cameras. It is a
+malnourished and underloved little brother of the commercial Majestic video streamer.
 
-### Maintainers Wanted
+### Supported hardware and features
 
-The project is currently looking for a maintainer (the original author doesn't have time anymore due to his business).
+| SoC Family  | Audio Stream | JPEG Snapshot | RTSP Stream | Motion Detect | On-Screen Display |
+|-------------|:------------:|:-------------:|:-----------:|:-------------:|:-----------------:|
+| Hi3516CV100 | ✗            | ✗             | ✗           | ⁿ/ₐ           | ✗                 |
+| Hi3516CV200 | ✗            | ✔️            | ✔️          | ✔️            | ✗                 |
+| Hi3516CV300 | ✗            | ✔️            | ✔️          | ✔️            | ✗                 |
+| Hi3516CV300 | ✗            | ✗             | ✗           | ✗             | ✗                 |
 
-Please contact [IgorZalatov](mailto:flyrouter@gmail.com) to inquire further.
+_✔️ - supported, ✗ - not supported, ⁿ/ₐ - not supported by hardware_
 
-### Platform support
+### Recommended hardware
+We recommend buying a [HiSilicon 3516CV300 + Sony IMX291](https://aliexpress.com/item/1005002315913099.html) 
+board as a development kit. This IP camera module comes with 128MB of RAM and 16MB SPI Flash ROM.
 
-| Family      | Audio | JPEG | RTSP | MD | OSD |
-| ----------- | ----- | ---- | ---- | -- | --- |
-| hi3516cv100 |   ❌  |  ❌  |  ❌  | ⁿ/ₐ | ❌ |
-| hi3516cv200 |   ❌  |  ✅  |  ✅  | ✅ |  ❌ |
-| hi3516cv300 |   ❌  |  ✅  |  ✅  | ✅ |  ❌ |
-| hi3516ev300 |   ❌  |  ❌  |  ❌  | ❌ |  ❌ |
+Use [Coupler](https://github.com/OpenIPC/coupler) to replace the stock firmware with OpenIPC.
+You won't even need to solder anything like a UART adapter.
 
-### Build with CMake
+### Building
+To clone the code locally, run
+```console
+git clone --recurse-submodules https://github.com/openipc/mini
+```
+or, if you have already checked out the repository without submodules, run
+```console
+git submodule init
+git submodule update
+```
 
+Build the code with CMake:
 ```console
 $ cmake -H. -Bbuild \
     -DCMAKE_BUILD_TYPE=Release \
@@ -29,55 +48,12 @@ $ cmake -H. -Bbuild \
     -DCMAKE_TOOLCHAIN_FILE=tools/cmake/toolchains/arm-openipc-linux-musleabi.cmake
 $ cmake --build build
 ```
+Where _<PATH_TO_SDK>_ is either `glutinium/hisi-osdrv2` or `glutinium/hisi-osdrv3`.
 
-Where <PATH_TO_SDK> either `glutinium/hisi-osdrv2` or `glutinium/hisi-osdrv3`
+### Configuration
+The Mini streamer does not support sensor autodetection yet. You will need to use
+`ipcinfo --long_sensor` to determine the sensor model and its control bus, and then set 
+the path to a corresponding config file as `sensor_config` parameter in `mini.ini`.
 
-### Hardware for development
-
-We consider buying [HiSilicon 3516CV300 + Sony IMX291
-board](https://aliexpress.com/item/1005002315913099.html) to use it as
-development kit. It has 128Mb of RAM and 16Mb of SPI Flash ROM. Use
-[Coupler](https://github.com/OpenIPC/coupler) to get rid of stock firmware and
-install OpenIPC (you don't even need to solder anything like UART adapter).
-
-### First run
-
-`Mini` has no sensor autodetection currently, but one can use built-in `ipcinfo
---long_sensor` to determine sensor type and its control bus and then manually
-specify appropriate sensor config file path in `sensor_config` in `mini.ini`
-
------
-
-### Support
-
-OpenIPC offers two levels of support.
-
-- Free support through the community via [chat](https://openipc.org/#telegram-chat-groups).
-- Paid commercial support (from the team of developers).
-
-Please consider subscribing for paid commercial support if you intend to use our product for business.
-As a paid customer, you will get technical support and maintenance services directly from our skilled team.
-Your bug reports and feature requests will get prioritized attention and expedited solutions. It's a win-win
-strategy for both parties, that would contribute to the stability your business, and help core developers
-to work on the project full-time.
-
-If you have any specific questions concerning our project, feel free to [contact us](mailto:flyrouter@gmail.com).
-
-### Participating and Contribution
-
-If you like what we do, and willing to intensify the development, please consider participating.
-
-You can improve existing code and send us patches. You can add new features missing from our code.
-
-You can help us to write a better documentation, proofread and correct our websites.
-
-You can just donate some money to cover the cost of development and long-term maintaining of what we believe
-is going to be the most stable, flexible, and open IP Network Camera Framework for users like yourself.
-
-You can make a financial contribution to the project at [Open Collective](https://opencollective.com/openipc/contribute/backer-14335/checkout).
-
-Thank you.
-
-<p align="center">
-<a href="https://opencollective.com/openipc/contribute/backer-14335/checkout" target="_blank"><img src="https://opencollective.com/webpack/donate/button@2x.png?color=blue" width="375" alt="Open Collective donate button"></a>
-</p>
+### Authors
+- [@widgetii](https://github.com/widgetii)
