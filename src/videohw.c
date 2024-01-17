@@ -1250,6 +1250,6 @@ int stop_sdk() {
 #include "mmap.h"
 
 void *mmap(void *start, size_t len, int prot, int flags, int fd, uint32_t off) {
-    return mmap64(start, len, prot, flags, fd, off);
+    return (void *)syscall(SYS_mmap2, start, len, prot, flags, fd, off >> 12);
 }
 #endif
