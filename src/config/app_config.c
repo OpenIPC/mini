@@ -34,6 +34,8 @@ enum ConfigError parse_app_config(const char *path) {
     app_config.align_width = 64;
     app_config.blk_cnt = 4;
     app_config.max_pool_cnt = 16;
+    app_config.mirror = false;
+    app_config.flip = false;
 
     app_config.night_mode_enable = false;
     app_config.ir_sensor_pin = 999;
@@ -177,6 +179,13 @@ enum ConfigError parse_app_config(const char *path) {
         if (err != CONFIG_OK)
             goto RET_ERR;
     }
+
+    err = parse_bool(&ini, "isp", "mirror", &app_config.mirror);
+    if (err != CONFIG_OK)
+        goto RET_ERR;
+    err = parse_bool(&ini, "isp", "flip", &app_config.flip);
+    if (err != CONFIG_OK)
+        goto RET_ERR;
 
     err = parse_bool(&ini, "rtsp", "enable", &app_config.rtsp_enable);
     if (err != CONFIG_OK)

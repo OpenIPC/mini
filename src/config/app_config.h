@@ -51,6 +51,8 @@ struct AppConfig {
     uint32_t align_width;
     uint32_t max_pool_cnt;
     uint32_t blk_cnt;
+    bool mirror;
+    bool flip;
 
     // [night_mode]
     bool night_mode_enable;
