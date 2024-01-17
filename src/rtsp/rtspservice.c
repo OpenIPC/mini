@@ -67,9 +67,9 @@ void PrefsInit() {
 
 #ifdef RTSP_DEBUG
     printf("\n");
-    printf("\thostname is: %s\n", stPrefs.hostname);
-    printf("\trtsp listening port is: %d\n", stPrefs.port);
-    printf("\tInput rtsp://hostIP:%d/test.264 to play this\n", stPrefs.port);
+    printf("\tHostname: %s\n", stPrefs.hostname);
+    printf("\tRTSP port: %d\n", stPrefs.port);
+    printf("\tInput rtsp://192.168.1.10:%d/test.264\n", stPrefs.port);
     printf("\n");
 #endif
 }
