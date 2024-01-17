@@ -63,7 +63,7 @@ int motion_detect_run(HI_VOID *pArgs) {
     MD_CHN md_chn = 0;
     MD_ATTR_S md_attr;
     md_attr.enAlgMode = MD_ALG_MODE_REF;
-    memset(&md_attr, 0, sizeof(VPSS_GRP_ATTR_S));
+    memset(&md_attr, 0, sizeof(md_attr));
     HI_S32 s32Ret = HI_IVS_MD_CreateChn(md_chn, &md_attr);
     if (HI_SUCCESS != s32Ret) {
         printf(

@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include <fcntl.h>
+#include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
@@ -37,7 +38,7 @@ bool set_u8(const uint32_t offset, const uint8_t value) {
         return false;
     }
     volatile char *mmap_ptr = mmap(
-        offset,     // Any adddress in our space will do
+        (void *)offset, // Any adddress in our space will do
         1,          // Map length
         PROT_WRITE, // Enable reading & writting to mapped memory
         MAP_SHARED, // Shared with other processes
@@ -55,14 +56,14 @@ bool set_u8(const uint32_t offset, const uint8_t value) {
     return true;
 }
 
-bool get_u8(const uint32_t offset, uint8_t *value) {
+bool get_u8(const uint32_t offset, enum PIN_DIRECTION *value) {
     int mem_fd = open("/dev/mem", O_RDWR | O_SYNC);
     if (mem_fd < 0) {
         printf("get_u8 can't open /dev/mem \n");
         return false;
     }
     volatile char *mmap_ptr = mmap(
-        offset,     // Any adddress in our space will do
+        (void *)offset, // Any adddress in our space will do
         1,          // Map length
         PROT_READ,  // Enable reading & writting to mapped memory
         MAP_SHARED, // Shared with other processes
@@ -87,7 +88,7 @@ bool set_u32(const uint32_t offset, const uint32_t value) {
         return false;
     }
     volatile char *mmap_ptr = mmap(
-        offset,     // Any adddress in our space will do
+        (void *)offset, // Any adddress in our space will do
         4,          // Map length
         PROT_WRITE, // Enable reading & writting to mapped memory
         MAP_SHARED, // Shared with other processes
@@ -115,7 +116,7 @@ bool get_u32(const uint32_t offset, uint32_t *value) {
         return false;
     }
     volatile char *mmap_ptr = mmap(
-        offset,     // Any adddress in our space will do
+        (void *)offset, // Any adddress in our space will do
         4,          // Map length
         PROT_READ,  // Enable reading & writting to mapped memory
         MAP_SHARED, // Shared with other processes
@@ -193,7 +194,7 @@ bool get_pin(const uint8_t port, const uint8_t pin, bool *value) {
 
     uint32_t gpio_port_addr = GPIO[port];
     gpio_port_addr = gpio_port_addr + 0x03FC;
-    uint8_t val;
+    enum PIN_DIRECTION val;
     if (!get_u8(gpio_port_addr, &val))
         return false;
     uint8_t bit = (val >> pin & 1);
@@ -255,7 +256,7 @@ bool set_pin_linux(const uint8_t pin_number, const bool bit) {
 // 0x0200 = 1000000000
 // 0x03FC = 1111111100
 
-const static struct Pin hi3518EV200_pins[] = {
+static struct Pin hi3518EV200_pins[] = {
     {.gpio = true,
      .port = 0,
      .pin = 6,

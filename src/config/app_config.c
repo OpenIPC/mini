@@ -246,20 +246,20 @@ enum ConfigError parse_app_config(const char *path) {
     parse_bool(&ini, "http_post", "enable", &app_config.http_post_enable);
     if (app_config.http_post_enable) {
         err = parse_param_value(
-            &ini, "http_post", "host", &app_config.http_post_host);
+            &ini, "http_post", "host", app_config.http_post_host);
         if (err != CONFIG_OK)
             goto RET_ERR;
         err = parse_param_value(
-            &ini, "http_post", "url", &app_config.http_post_url);
+            &ini, "http_post", "url", app_config.http_post_url);
         if (err != CONFIG_OK)
             goto RET_ERR;
 
         err = parse_param_value(
-            &ini, "http_post", "login", &app_config.http_post_login);
+            &ini, "http_post", "login", app_config.http_post_login);
         if (err != CONFIG_OK)
             goto RET_ERR;
         err = parse_param_value(
-            &ini, "http_post", "password", &app_config.http_post_password);
+            &ini, "http_post", "password", app_config.http_post_password);
         if (err != CONFIG_OK)
             goto RET_ERR;
 

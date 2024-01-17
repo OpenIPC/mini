@@ -35,7 +35,7 @@ HI_S32 post_send(struct JpegData *jpeg) {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
         printf(tag "socket creation failed...\n");
-        return NULL;
+        return 0;
     }
 
     struct addrinfo *server_addr;
