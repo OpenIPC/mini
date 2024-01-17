@@ -17,7 +17,7 @@ malnourished and underloved little brother of the commercial Majestic video stre
 | Hi3516CV100 | ✗            | ✗             | ✗           | ⁿ/ₐ           | ✗                 |
 | Hi3516CV200 | ✗            | ✔️            | ✔️          | ✔️            | ✗                 |
 | Hi3516CV300 | ✗            | ✔️            | ✔️          | ✔️            | ✗                 |
-| Hi3516CV300 | ✗            | ✗             | ✗           | ✗             | ✗                 |
+| Hi3516CV500 | ✗            | ✗             | ✗           | ✗             | ✗                 |
 
 _✔️ - supported, ✗ - not supported, ⁿ/ₐ - not supported by hardware_
 
