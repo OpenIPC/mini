@@ -68,8 +68,7 @@ void PrefsInit() {
 #ifdef RTSP_DEBUG
     printf("\n");
     printf("\tHostname: %s\n", stPrefs.hostname);
-    printf("\tRTSP port: %d\n", stPrefs.port);
-    printf("\tInput rtsp://192.168.1.10:%d/test.264\n", stPrefs.port);
+    printf("\tInput: rtsp://192.168.1.10:%d/test.264\n", stPrefs.port);
     printf("\n");
 #endif
 }
@@ -960,7 +959,7 @@ int RTSP_setup(RTSP_buffer *pRtsp) {
     {
         // Transport: RTP/AVP
         pStr += strlen(RTSP_RTP_AVP);
-        if (!*pStr || (*pStr == ';') || (*pStr == ' ')) {
+        if (!*pStr || (*pStr == ';') || (*pStr == ' ') || (*pStr == '/')) {
             //单播
             if (strstr(
                     s8TranStr,
